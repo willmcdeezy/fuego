@@ -16,11 +16,9 @@ use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 use utils::string_to_pub_key;
 
-// Token mint addresses
+// Token mint addresses (from CoinMarketCap)
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const PYUSD_MINT: &str = "PyUvTEBjM1yGH3FPz8fs9cTSMUq534YEGU3RLWQ5o9t";
-// Token Program 2022 (for PYUSD)
-const TOKEN_PROGRAM_2022: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+const PYUSD_MINT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
 
 #[derive(Serialize, Deserialize)]
 struct RpcNetwork {
@@ -227,38 +225,26 @@ async fn get_pyusd_balance(
         }
     };
 
-    let token_program_2022 = match string_to_pub_key(TOKEN_PROGRAM_2022) {
-        Ok(program) => program,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Failed to parse Token Program 2022"
-            }))
-            .into_response();
-        }
-    };
+    // Derive the Associated Token Account (ATA)
+    let associated_token_account = get_associated_token_address(&pubkey, &pyusd_mint);
 
-    // Use Token Program 2022 for PYUSD
-    let associated_token_account = spl_associated_token_account::get_associated_token_address_with_program_id(
-        &pubkey,
-        &pyusd_mint,
-        &token_program_2022,
-    );
-
+    // Fetch the token account data and balance via RPC
     match rpc.get_token_account_balance(&associated_token_account) {
-        Ok(balance) => Json(json!({
-            "success": true,
-            "data": {
-                "address": payload.address,
-                "amount": balance.amount,
-                "decimals": balance.decimals,
-                "ui_amount": balance.ui_amount_string,
-                "network": payload.network,
-                "token": "PYUSD",
-                "program": "Token Program 2022"
-            }
-        }))
-        .into_response(),
+        Ok(balance) => {
+            Json(json!({
+                "success": true,
+                "data": {
+                    "address": payload.address,
+                    "amount": balance.amount,
+                    "decimals": balance.decimals,
+                    "ui_amount": balance.ui_amount_string,
+                    "network": payload.network,
+                    "token": "PYUSD",
+                    "mint": PYUSD_MINT
+                }
+            }))
+            .into_response()
+        }
         Err(e) => Json(json!({
             "success": false,
             "error": format!("Failed to get PYUSD balance: {}", e)
