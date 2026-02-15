@@ -198,108 +198,19 @@ async fn get_usdc_balance(
     }
 }
 
+// TODO: PYUSD balance endpoint using Token-2022
+// Requires getTokenAccountsByOwner implementation
+// Issue: Standard ATA derivation doesn't work for Token-2022
+// Solution: Enumerate all token accounts owned by wallet and find by mint
+/*
 async fn get_pyusd_balance(
     State(_state): State<AppState>,
     Json(payload): Json<GetTokenBalanceRequest>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let commitment = get_commitment_config(&payload.commitment);
-    let rpc = RpcClient::new_with_commitment(rpc_url, commitment);
-
-    let pubkey = match string_to_pub_key(&payload.address) {
-        Ok(pk) => pk,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Invalid wallet address"
-            }))
-            .into_response();
-        }
-    };
-
-    let pyusd_mint = match string_to_pub_key(PYUSD_MINT) {
-        Ok(mint) => mint,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Failed to parse PYUSD mint"
-            }))
-            .into_response();
-        }
-    };
-
-    // Try to find PYUSD token account using get_token_accounts_by_owner
-    // This works for both SPL and Token-2022 tokens
-    // Note: RpcClient::get_token_accounts_by_owner in solana_client 2.0.7 may have different API
-    // For now, we'll use the previously working direct ATA derivation approach
-    let token_account_pubkey = get_associated_token_address(&pubkey, &pyusd_mint);
-
-    match rpc.get_token_account_balance(&token_account_pubkey) {
-        Ok(balance) => {
-            Json(json!({
-                "success": true,
-                "data": {
-                    "address": payload.address,
-                    "amount": balance.amount,
-                    "decimals": balance.decimals,
-                    "ui_amount": balance.ui_amount_string,
-                    "network": payload.network,
-                    "token": "PYUSD",
-                    "mint": PYUSD_MINT,
-                    "token_account": token_account_pubkey.to_string(),
-                    "program": "Token Program 2022"
-                }
-            }))
-            .into_response()
-        }
-        Err(_) => {
-            // If direct ATA derivation fails, try using Token Program 2022 ATA
-            let token_program_2022 = match string_to_pub_key(TOKEN_PROGRAM_2022) {
-                Ok(program) => program,
-                Err(_) => {
-                    return Json(json!({
-                        "success": false,
-                        "error": "Failed to parse Token Program 2022"
-                    }))
-                    .into_response();
-                }
-            };
-
-            let token_2022_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
-                &pubkey,
-                &pyusd_mint,
-                &token_program_2022,
-            );
-
-            match rpc.get_token_account_balance(&token_2022_ata) {
-        Ok(balance) => {
-            Json(json!({
-                "success": true,
-                "data": {
-                    "address": payload.address,
-                    "amount": balance.amount,
-                    "decimals": balance.decimals,
-                    "ui_amount": balance.ui_amount_string,
-                    "network": payload.network,
-                    "token": "PYUSD",
-                    "mint": PYUSD_MINT,
-                    "token_account": token_2022_ata.to_string(),
-                    "program": "Token Program 2022"
-                }
-            }))
-            .into_response()
-        }
-        Err(e) => {
-            Json(json!({
-                "success": false,
-                "error": format!("Failed to get PYUSD balance: {}", e)
-            }))
-            .into_response()
-        }
-            }
-        }
-    }
+    // TODO: Implement getTokenAccountsByOwner search
+    // For now, see get_usdc_balance as working reference
 }
+*/
 
 #[tokio::main]
 async fn main() {
@@ -319,19 +230,22 @@ async fn main() {
         .route("/latest-hash", post(get_latest_hash))
         .route("/balance", post(get_balance))
         .route("/usdc-balance", post(get_usdc_balance))
-        .route("/pyusd-balance", post(get_pyusd_balance))
+        // TODO: .route("/pyusd-balance", post(get_pyusd_balance))
         .layer(cors)
         .with_state(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     println!("🔥 Fuego server running on http://{}", addr);
     println!("Endpoints:");
-    println!("  POST /latest-hash - Get latest blockhash");
-    println!("  POST /balance - Get SOL balance for address");
-    println!("  POST /usdc-balance - Get USDC balance (default: confirmed commitment)");
-    println!("  POST /pyusd-balance - Get PYUSD balance (default: confirmed commitment)");
-    println!("  GET  /health - Health check");
-    println!("  GET  /network - Get default network");
+    println!("  READ:");
+    println!("    GET  /health - Health check");
+    println!("    GET  /network - Get default network");
+    println!("    POST /latest-hash - Get latest blockhash");
+    println!("    POST /balance - Get SOL balance");
+    println!("    POST /usdc-balance - Get USDC balance");
+    println!("  TRANSFER (TODO):");
+    println!("    POST /transfer-sol - Build & submit SOL transfer");
+    println!("    POST /transfer-usdc - Build & submit USDC transfer");
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
