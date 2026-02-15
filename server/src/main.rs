@@ -19,6 +19,8 @@ use utils::string_to_pub_key;
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const PYUSD_MINT: &str = "PyUvTEBjM1yGH3FPz8fs9cTSMUq534YEGU3RLWQ5o9t";
+// Token Program 2022 (for PYUSD)
+const TOKEN_PROGRAM_2022: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
 #[derive(Serialize, Deserialize)]
 struct RpcNetwork {
@@ -225,7 +227,23 @@ async fn get_pyusd_balance(
         }
     };
 
-    let associated_token_account = get_associated_token_address(&pubkey, &pyusd_mint);
+    let token_program_2022 = match string_to_pub_key(TOKEN_PROGRAM_2022) {
+        Ok(program) => program,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to parse Token Program 2022"
+            }))
+            .into_response();
+        }
+    };
+
+    // Use Token Program 2022 for PYUSD
+    let associated_token_account = spl_associated_token_account::get_associated_token_address_with_program_id(
+        &pubkey,
+        &pyusd_mint,
+        &token_program_2022,
+    );
 
     match rpc.get_token_account_balance(&associated_token_account) {
         Ok(balance) => Json(json!({
@@ -236,7 +254,8 @@ async fn get_pyusd_balance(
                 "decimals": balance.decimals,
                 "ui_amount": balance.ui_amount_string,
                 "network": payload.network,
-                "token": "PYUSD"
+                "token": "PYUSD",
+                "program": "Token Program 2022"
             }
         }))
         .into_response(),
