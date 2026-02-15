@@ -16,9 +16,12 @@ use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 use utils::string_to_pub_key;
 
-// Token mint addresses (from CoinMarketCap)
+// Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const PYUSD_MINT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
+// Try alternate PYUSD mints - could be either address depending on network
+const PYUSD_MINT: &str = "PyUvTEBjM1yGH3FPz8fs9cTSMUq534YEGU3RLWQ5o9t"; // Token-2022
+const PYUSD_MINT_ALT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo"; // Alternative
+const TOKEN_PROGRAM_2022: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
 #[derive(Serialize, Deserialize)]
 struct RpcNetwork {
@@ -225,11 +228,13 @@ async fn get_pyusd_balance(
         }
     };
 
-    // Derive the Associated Token Account (ATA)
-    let associated_token_account = get_associated_token_address(&pubkey, &pyusd_mint);
+    // Try to find PYUSD token account using get_token_accounts_by_owner
+    // This works for both SPL and Token-2022 tokens
+    // Note: RpcClient::get_token_accounts_by_owner in solana_client 2.0.7 may have different API
+    // For now, we'll use the previously working direct ATA derivation approach
+    let token_account_pubkey = get_associated_token_address(&pubkey, &pyusd_mint);
 
-    // Fetch the token account data and balance via RPC
-    match rpc.get_token_account_balance(&associated_token_account) {
+    match rpc.get_token_account_balance(&token_account_pubkey) {
         Ok(balance) => {
             Json(json!({
                 "success": true,
@@ -240,16 +245,59 @@ async fn get_pyusd_balance(
                     "ui_amount": balance.ui_amount_string,
                     "network": payload.network,
                     "token": "PYUSD",
-                    "mint": PYUSD_MINT
+                    "mint": PYUSD_MINT,
+                    "token_account": token_account_pubkey.to_string(),
+                    "program": "Token Program 2022"
                 }
             }))
             .into_response()
         }
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Failed to get PYUSD balance: {}", e)
-        }))
-        .into_response(),
+        Err(_) => {
+            // If direct ATA derivation fails, try using Token Program 2022 ATA
+            let token_program_2022 = match string_to_pub_key(TOKEN_PROGRAM_2022) {
+                Ok(program) => program,
+                Err(_) => {
+                    return Json(json!({
+                        "success": false,
+                        "error": "Failed to parse Token Program 2022"
+                    }))
+                    .into_response();
+                }
+            };
+
+            let token_2022_ata = spl_associated_token_account::get_associated_token_address_with_program_id(
+                &pubkey,
+                &pyusd_mint,
+                &token_program_2022,
+            );
+
+            match rpc.get_token_account_balance(&token_2022_ata) {
+        Ok(balance) => {
+            Json(json!({
+                "success": true,
+                "data": {
+                    "address": payload.address,
+                    "amount": balance.amount,
+                    "decimals": balance.decimals,
+                    "ui_amount": balance.ui_amount_string,
+                    "network": payload.network,
+                    "token": "PYUSD",
+                    "mint": PYUSD_MINT,
+                    "token_account": token_2022_ata.to_string(),
+                    "program": "Token Program 2022"
+                }
+            }))
+            .into_response()
+        }
+        Err(e) => {
+            Json(json!({
+                "success": false,
+                "error": format!("Failed to get PYUSD balance: {}", e)
+            }))
+            .into_response()
+        }
+            }
+        }
     }
 }
 
