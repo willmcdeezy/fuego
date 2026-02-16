@@ -243,7 +243,7 @@ signed_tx_b64 = base64.b64encode(tx.to_bytes()).decode()
 
 ## Available Endpoints
 
-### Read Endpoints
+### Query Endpoints (No Signing Required)
 
 **Get SOL Balance**:
 ```bash
@@ -255,7 +255,19 @@ curl -X POST http://127.0.0.1:8080/balance \
   }'
 ```
 
-**Get USDC Balance**:
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "sol": 5.5,
+    "lamports": 5500000000,
+    "network": "mainnet-beta"
+  }
+}
+```
+
+**Get USDC Balance** (Mint: EPjFWdd5Au...):
 ```bash
 curl -X POST http://127.0.0.1:8080/usdc-balance \
   -H "Content-Type: application/json" \
@@ -265,7 +277,20 @@ curl -X POST http://127.0.0.1:8080/usdc-balance \
   }'
 ```
 
-**Get USDT Balance**:
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "usdc": 100.5,
+    "raw": 100500000,
+    "decimals": 6,
+    "network": "mainnet-beta"
+  }
+}
+```
+
+**Get USDT Balance** (Mint: Es9vMFrz...):
 ```bash
 curl -X POST http://127.0.0.1:8080/usdt-balance \
   -H "Content-Type: application/json" \
@@ -275,63 +300,137 @@ curl -X POST http://127.0.0.1:8080/usdt-balance \
   }'
 ```
 
-**Get Latest Blockhash**:
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "usdt": 50.0,
+    "raw": 50000000,
+    "decimals": 6,
+    "network": "mainnet-beta"
+  }
+}
+```
+
+**Get Latest Blockhash** (for transaction building):
 ```bash
 curl -X POST http://127.0.0.1:8080/latest-hash \
   -H "Content-Type: application/json" \
   -d '{"network": "mainnet-beta"}'
 ```
 
-### Transfer Endpoints
-
-**Build USDC Transfer**:
-```bash
-curl -X POST http://127.0.0.1:8080/build-transfer-usdc \
-  -H "Content-Type: application/json" \
-  -d '{
-    "network": "mainnet-beta",
-    "from_address": "...",
-    "to_address": "...",
-    "amount": "10.5",
-    "yid": "unique-tx-id"
-  }'
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "blockhash": "7H1rZ3...",
+    "last_valid_block_height": 286000000,
+    "network": "mainnet-beta"
+  }
+}
 ```
 
-**Build SOL Transfer**:
+### Transaction Building Endpoints
+
+**Build SOL Transfer** (Plain Solana native token):
 ```bash
 curl -X POST http://127.0.0.1:8080/build-transfer-sol \
   -H "Content-Type: application/json" \
   -d '{
     "network": "mainnet-beta",
-    "from_address": "...",
-    "to_address": "...",
+    "from_address": "YOUR_ADDRESS",
+    "to_address": "RECIPIENT_ADDRESS",
     "amount": "0.1",
-    "yid": "unique-tx-id"
+    "yid": "agent-unique-tx-id"
   }'
 ```
 
-**Build USDT Transfer**:
+**Build USDC Transfer** (SPL Token, 6 decimals):
+```bash
+curl -X POST http://127.0.0.1:8080/build-transfer-usdc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "from_address": "YOUR_ADDRESS",
+    "to_address": "RECIPIENT_ADDRESS",
+    "amount": "10.5",
+    "yid": "agent-unique-tx-id"
+  }'
+```
+
+**Build USDT Transfer** (SPL Token, 6 decimals):
 ```bash
 curl -X POST http://127.0.0.1:8080/build-transfer-usdt \
   -H "Content-Type: application/json" \
   -d '{
     "network": "mainnet-beta",
-    "from_address": "...",
-    "to_address": "...",
+    "from_address": "YOUR_ADDRESS",
+    "to_address": "RECIPIENT_ADDRESS",
     "amount": "100",
-    "yid": "unique-tx-id"
+    "yid": "agent-unique-tx-id"
   }'
 ```
 
-**Submit Signed Transaction**:
+All build endpoints return:
+```json
+{
+  "success": true,
+  "data": {
+    "transaction": "base64-encoded-unsigned-tx",
+    "blockhash": "7H1rZ3...",
+    "memo": "fuego|{token}|f:{from}|t:{to}|a:{amount}|yid:{yid}",
+    "network": "mainnet-beta"
+  }
+}
+```
+
+### Transaction Submission
+
+**Submit Signed Transaction** (from `/submit-transaction`):
 ```bash
 curl -X POST http://127.0.0.1:8080/submit-transaction \
   -H "Content-Type: application/json" \
   -d '{
     "network": "mainnet-beta",
-    "transaction": "base64-signed-tx"
+    "transaction": "base64-encoded-signed-tx"
   }'
 ```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "signature": "TRANSACTION_SIGNATURE",
+    "explorer_link": "https://explorer.solana.com/tx/SIGNATURE?cluster=mainnet-beta",
+    "network": "mainnet-beta",
+    "status": "submitted"
+  }
+}
+```
+
+---
+
+## Token Reference
+
+**Solana Native (SOL)**:
+- Program: System Program
+- Decimals: 9
+- Transfer type: Direct system instruction
+
+**USDC** (USD Coin):
+- Mint: `EPjFWdd5Au4zFs8K7Auw4KWTuM6ivPQmWvzJpStb4aKj`
+- Decimals: 6
+- Issuer: Circle
+- Program: Token-2022
+
+**USDT** (Tether USD):
+- Mint: `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenEqw`
+- Decimals: 6
+- Issuer: Tether
+- Program: Token-2022
 
 ---
 
