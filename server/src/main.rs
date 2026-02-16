@@ -93,6 +93,14 @@ struct SubmitTransactionRequest {
     commitment: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct GetAccountSignatures {
+    address: String,
+    network: String,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct BalanceResponse {
@@ -770,6 +778,62 @@ async fn submit_transaction(
     }
 }
 
+async fn get_fuego_transactions(
+    Json(payload): Json<GetAccountSignatures>,
+) -> Response {
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let user_pubkey = match string_to_pub_key(&payload.address) {
+        Ok(pubkey) => pubkey,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid wallet address"
+            }))
+            .into_response()
+        }
+    };
+
+    let config = solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config {
+        before: None,
+        until: None,
+        limit: payload.limit.or(Some(10)), // Default to 10 transactions
+        commitment: Some(CommitmentConfig::confirmed()),
+    };
+
+    let signatures = match rpc.get_signatures_for_address_with_config(&user_pubkey, config) {
+        Ok(signatures) => signatures,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Could not retrieve signatures for account"
+            }))
+            .into_response()
+        }
+    };
+
+    // Filter transactions that contain "fuego" in memo (Fuego branding)
+    // Memo format: fuego|{token}|f:{from}|t:{to}|a:{amount}|yid:{yid}|n:{notes}
+    // Parsing happens on the frontend
+    let fuego_transactions: Vec<_> = signatures
+        .into_iter()
+        .filter(|sig_info| {
+            sig_info.memo.as_ref().map_or(false, |memo| {
+                memo.to_lowercase().contains("fuego")
+            })
+        })
+        .collect();
+
+    Json(json!({
+        "success": true,
+        "data": fuego_transactions,
+        "network": payload.network,
+        "status": "Successful account signatures request"
+    }))
+    .into_response()
+}
+
 // TODO: PYUSD balance endpoint using Token-2022
 // Requires getTokenAccountsByOwner implementation
 // Issue: Standard ATA derivation doesn't work for Token-2022
@@ -809,6 +873,7 @@ async fn main() {
         .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/build-transfer-usdt", post(build_transfer_usdt))
         .route("/submit-transaction", post(submit_transaction))
+        .route("/transaction-history", post(get_fuego_transactions))
         // TODO: .route("/pyusd-balance", post(get_pyusd_balance))
         .layer(cors)
         .with_state(state);

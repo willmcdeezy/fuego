@@ -102,19 +102,25 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 1
 ```
 Agent / User Scripts
        ↓
-  Fuego Server (localhost:8080)
-  • Builds unsigned transactions
-  • Queries balances & blockhashes
+Fuego Server (localhost:8080)
+  • /balance, /usdc-balance, /usdt-balance (query endpoints)
+  • /build-transfer-sol, /build-transfer-usdc, /build-transfer-usdt (returns unsigned tx)
        ↓
-Client Wallet (TypeScript / Python)
-  • Signs locally with encrypted keys
+Python Script / Client Wallet
+  • Signs locally with encrypted keys from Fuego Wallet
   • Never exposes private keys
        ↓
-  Solana RPC (mainnet-beta)
-  • Broadcasts only
+Fuego Server (localhost:8080)
+  • /submit-transaction (receives signed tx)
+  • Broadcasts to Solana RPC endpoint (mainnet-beta)
 ```
 
-**Key security property**: Private keys stay on your machine. Server is a pure RPC proxy.
+**Key security property**: 
+- Private keys never leave your machine
+- Agent queries Fuego Server for unsigned transactions
+- Agent signs locally with encrypted wallet
+- Agent submits signed transaction back to Fuego Server
+- Fuego Server is the **exclusive broadcaster** to Solana RPC
 
 ---
 

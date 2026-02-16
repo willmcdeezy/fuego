@@ -166,20 +166,25 @@ Makes it easy for users to copy without other text getting selected.
 
 ## Core Workflow
 
-### Step 1: Build Unsigned Transaction (Server)
+### Workflow: Request → Sign → Submit
 
-**Request** to `POST /build-transfer-usdc`:
-```json
-{
-  "network": "mainnet-beta",
-  "from_address": "YOUR_WALLET_ADDRESS",
-  "to_address": "RECIPIENT_ADDRESS",
-  "amount": "10.5",
-  "yid": "agent-123-tx-001"
-}
+**Step 1: Request Unsigned Transaction from Fuego Server**
+
+Agent/script calls Fuego Server to build an unsigned transaction:
+
+```bash
+curl -X POST http://127.0.0.1:8080/build-transfer-usdc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "from_address": "YOUR_WALLET_ADDRESS",
+    "to_address": "RECIPIENT_ADDRESS",
+    "amount": "10.5",
+    "yid": "agent-123-tx-001"
+  }'
 ```
 
-**Response**:
+**Response from Fuego Server:**
 ```json
 {
   "success": true,
@@ -192,39 +197,49 @@ Makes it easy for users to copy without other text getting selected.
 }
 ```
 
-### Step 2: Sign with Fuego Wallet (Client)
+---
+
+**Step 2: Sign Locally with Python/TypeScript Script**
+
+Your client-side script signs the unsigned transaction with your encrypted Fuego Wallet:
 
 ```python
-# Sign locally with your encrypted wallet
 from fuego.wallet import FuegoWallet
 from solders.transaction import Transaction
 import base64
 
-# Load wallet (prompts for password)
+# Load encrypted wallet (prompts for password)
 wallet = FuegoWallet.load("~/.fuego/wallet.json")
 
-# Deserialize unsigned tx from server
+# Deserialize unsigned tx from Fuego Server
 tx_bytes = base64.b64decode(response['data']['transaction'])
 tx = Transaction.from_bytes(tx_bytes)
 
-# Sign with local keypair
+# Sign with local keypair (keys never leave this machine)
 tx.sign([wallet.keypair])
 
-# Serialize signed tx
+# Serialize signed tx for submission
 signed_tx_b64 = base64.b64encode(tx.to_bytes()).decode()
 ```
 
-### Step 3: Submit Signed Transaction (Server)
+**Key Point:** Private keys stay on your machine. This script never sends keys anywhere.
 
-**Request** to `POST /submit-transaction`:
-```json
-{
-  "network": "mainnet-beta",
-  "transaction": "base64-signed-tx"
-}
+---
+
+**Step 3: Submit Signed Transaction Back to Fuego Server**
+
+Send the signed transaction back to Fuego Server for broadcasting:
+
+```bash
+curl -X POST http://127.0.0.1:8080/submit-transaction \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "transaction": "base64-signed-tx"
+  }'
 ```
 
-**Response**:
+**Response from Fuego Server (broadcasts to Solana RPC):**
 ```json
 {
   "success": true,
@@ -238,6 +253,23 @@ signed_tx_b64 = base64.b64encode(tx.to_bytes()).decode()
 ```
 
 ✅ Click the `explorer_link` to verify on-chain immediately!
+
+---
+
+## Complete Flow Summary
+
+```
+1. Agent → Fuego Server (8080)         [Request: build unsigned tx]
+2. Fuego Server → Agent                [Response: unsigned tx + blockhash]
+3. Agent → Python/TS Script            [Sign with local encrypted wallet]
+4. Python/TS Script → Agent            [Signed tx (keys stayed local)]
+5. Agent → Fuego Server (8080)         [Request: submit signed tx]
+6. Fuego Server → Solana RPC           [Broadcast: signed transaction]
+7. Solana RPC → Fuego Server           [Response: signature + explorer link]
+8. Fuego Server → Agent                [Confirmation: tx submitted]
+```
+
+**Security guarantee:** Fuego Server never touches private keys. Keys are signed locally and never leave your machine.
 
 ---
 
@@ -534,6 +566,11 @@ python3 scripts/sign_and_submit.py --network devnet
 **Server won't start**
 - Check port 8080 isn't in use: `lsof -i :8080`
 - Try different port: `./fuego-server --port 8081`
+
+**"Failed to fetch" or "Failed to load balances" (Dashboard)**
+- **Check Fuego server is running**: `curl http://127.0.0.1:8080/health` or `ps aux | grep fuego-server`
+- Start server: `~/.fuego/server/fuego-server`
+- Dashboard cannot fetch balances without the server running on port 8080
 
 ---
 

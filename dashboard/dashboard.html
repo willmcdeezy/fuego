@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuego Wallet</title>
+    <link rel="stylesheet" href="theme.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #eef0f3;
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --accent-purple: #667eea;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-orange: #f59e0b;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #0f1419;
+                --bg-secondary: #1a202c;
+                --bg-tertiary: #2d3748;
+                --text-primary: #f5f7fa;
+                --text-secondary: #a0aec0;
+                --border-color: #2d3748;
+                --accent-purple: #8b5cf6;
+                --accent-green: #10b981;
+                --accent-blue: #60a5fa;
+                --accent-orange: #f59e0b;
+            }
+        }
+
+        html {
+            background: var(--bg-primary);
+            color-scheme: light dark;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            margin-bottom: 40px;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            font-size: 32px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        /* Wallet Address Card */
+        .address-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+
+        .address-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .address-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .address-text {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--text-primary);
+            word-break: break-all;
+            flex: 1;
+        }
+
+        .copy-btn {
+            flex-shrink: 0;
+            background: var(--accent-purple);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
+        .copy-btn.copied {
+            background: var(--accent-green);
+        }
+
+        /* Balances Section */
+        .section-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 32px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .balances-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .balance-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+
+        .balance-item:hover {
+            border-color: var(--accent-purple);
+            background: var(--bg-tertiary);
+        }
+
+        .balance-item.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .balance-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .balance-label-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .dot-sol {
+            background: #14f195;
+        }
+
+        .dot-usdc {
+            background: #2a52be;
+        }
+
+        .dot-usdt {
+            background: #26a17b;
+        }
+
+        .balance-amount {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .balance-unit {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error */
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            font-size: 13px;
+        }
+
+        /* Transactions */
+        .tx-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .tx-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .tx-item:hover {
+            border-color: var(--accent-purple);
+            background: var(--bg-tertiary);
+        }
+
+        .tx-info {
+            flex: 1;
+        }
+
+        .tx-signature {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+            word-break: break-all;
+            margin-bottom: 6px;
+        }
+
+        .tx-amount {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tx-link a {
+            color: var(--accent-purple);
+            text-decoration: none;
+            font-size: 12px;
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+
+        .tx-link a:hover {
+            background: var(--accent-purple);
+            color: white;
+            border-color: var(--accent-purple);
+        }
+
+        .no-transactions {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 30px 20px;
+            font-size: 13px;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                padding: 16px;
+            }
+
+            .balances-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .address-display {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .copy-btn {
+                width: 100%;
+            }
+
+            .balance-amount {
+                font-size: 20px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <span class="logo">🔥</span>
+                <div>
+                    <h1>Fuego</h1>
+                    <p>Agent Solana Wallet</p>
+                </div>
+                <button id="themeToggle" onclick="toggleTheme()" style="margin-left: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px;">🌙 Dark</button>
+            </div>
+
+            <!-- Address Card -->
+            <div class="address-card">
+                <div class="address-label">Wallet Address</div>
+                <div class="address-display">
+                    <div class="address-text" id="address">Loading...</div>
+                    <button class="copy-btn" onclick="copyAddress()">Copy</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div id="error"></div>
+
+        <!-- Balances -->
+        <div class="section-title">Balances</div>
+        <div class="balances-grid" id="balances">
+            <div class="balance-item full-width loading">
+                <div class="spinner"></div>
+                <span>Loading balances...</span>
+            </div>
+        </div>
+
+        <!-- Transactions -->
+        <div class="section-title">Recent Activity</div>
+        <div class="tx-list" id="txList">
+            <div class="no-transactions">No transactions yet</div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Fuego • Secure agent Solana wallet<br/>mainnet-beta</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8080';
+        const NETWORK = 'mainnet-beta';
+        
+        // CoinGecko API for token prices (free tier)
+        const COINGECKO_API = 'https://api.coingecko.com/api/v3';
+        
+        // Token IDs for CoinGecko
+        const TOKEN_IDS = {
+            'SOL': 'solana',
+            'USDC': 'usd-coin',
+            'USDT': 'tether'
+        };
+
+        async function loadDashboard() {
+            try {
+                const address = await getWalletAddress();
+                document.getElementById('address').textContent = address;
+                await loadBalances(address);
+                await loadTransactions(address);
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        async function getWalletAddress() {
+            // Load from embedded config (not URL for privacy)
+            const CONFIG_WALLET = 'FgbVaHht1zSBtFUNGDu6E4BkVBuGXWhpS8JeFpCGEquL';
+            return CONFIG_WALLET;
+        }
+
+        async function loadBalances(address) {
+            const container = document.getElementById('balances');
+            
+            try {
+                // Fetch prices alongside balances
+                const [solRes, usdcRes, usdtRes, prices] = await Promise.all([
+                    fetch(`${API_URL}/balance`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ network: NETWORK, address })
+                    }),
+                    fetch(`${API_URL}/usdc-balance`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ network: NETWORK, address })
+                    }),
+                    fetch(`${API_URL}/usdt-balance`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ network: NETWORK, address })
+                    }),
+                    fetchTokenPrices()
+                ]);
+
+                const solData = await solRes.json();
+                const usdcData = await usdcRes.json();
+                const usdtData = await usdtRes.json();
+
+                let html = '';
+
+                if (solData.success && solData.data && solData.data.sol !== undefined) {
+                    const solAmount = solData.data.sol || 0;
+                    const solPrice = prices?.solana?.usd;
+                    const usdValue = solPrice ? formatUSDPrice(solAmount * solPrice) : '';
+                    html += `
+                        <div class="balance-item">
+                            <div class="balance-label">
+                                <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 24px; height: 24px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                                SOL
+                            </div>
+                            <div class="balance-amount">${solAmount.toFixed(9)}</div>
+                            ${usdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdValue}</div>` : ''}
+                            <div class="balance-unit">Solana</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="balance-item">
+                            <div class="balance-label">
+                                <span class="balance-label-dot dot-sol"></span>
+                                SOL
+                            </div>
+                            <div class="balance-amount">—</div>
+                            <div class="balance-unit">Error loading</div>
+                        </div>
+                    `;
+                }
+
+                if (usdcData.success && usdcData.data && usdcData.data.usdc !== undefined) {
+                    const usdcAmount = usdcData.data.usdc || 0;
+                    const usdcPrice = prices?.['usd-coin']?.usd;
+                    const usdValue = usdcPrice ? formatUSDPrice(usdcAmount * usdcPrice) : '';
+                    html += `
+                        <div class="balance-item">
+                            <div class="balance-label">
+                                <img src="tokens/usdc.svg" alt="USDC" style="width: 24px; height: 24px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                                USDC
+                            </div>
+                            <div class="balance-amount">$${usdcAmount.toFixed(6)}</div>
+                            ${usdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdValue}</div>` : ''}
+                            <div class="balance-unit">USD Coin</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="balance-item">
+                            <div class="balance-label">
+                                <span class="balance-label-dot dot-usdc"></span>
+                                USDC
+                            </div>
+                            <div class="balance-amount">—</div>
+                            <div class="balance-unit">No account</div>
+                        </div>
+                    `;
+                }
+
+                if (usdtData.success && usdtData.data && usdtData.data.usdt !== undefined) {
+                    const usdtAmount = usdtData.data.usdt || 0;
+                    const usdtPrice = prices?.tether?.usd;
+                    const usdValue = usdtPrice ? formatUSDPrice(usdtAmount * usdtPrice) : '';
+                    html += `
+                        <div class="balance-item">
+                            <div class="balance-label">
+                                <img src="tokens/usdt.svg" alt="USDT" style="width: 24px; height: 24px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                                USDT
+                            </div>
+                            <div class="balance-amount">$${usdtAmount.toFixed(6)}</div>
+                            ${usdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdValue}</div>` : ''}
+                            <div class="balance-unit">Tether</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="balance-item">
+                            <div class="balance-label">
+                                <span class="balance-label-dot dot-usdt"></span>
+                                USDT
+                            </div>
+                            <div class="balance-amount">—</div>
+                            <div class="balance-unit">No account</div>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = html;
+            } catch (error) {
+                showError(`Failed to load balances: ${error.message}`);
+            }
+        }
+
+        function formatAddress(addr) {
+            if (!addr || addr.length < 16) return addr || 'unknown';
+            return `${addr.substring(0, 4)}…${addr.substring(addr.length - 4)}`;
+        }
+
+        // Fetch token prices from CoinGecko
+        async function fetchTokenPrices() {
+            try {
+                const ids = Object.values(TOKEN_IDS).join(',');
+                const response = await fetch(`${COINGECKO_API}/simple/price?ids=${ids}&vs_currencies=usd`);
+                if (!response.ok) throw new Error('Price fetch failed');
+                return await response.json();
+            } catch (error) {
+                console.log('CoinGecko error:', error);
+                return null;
+            }
+        }
+
+        function formatUSDPrice(price) {
+            if (!price) return '';
+            return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+        }
+
+        function getTxIcon(isOutgoing) {
+            return isOutgoing ? '📤' : '📥';
+        }
+
+        function formatAmount(rawAmount, token) {
+            if (!rawAmount || isNaN(rawAmount)) return '0';
+            const amount = parseFloat(rawAmount);
+            
+            // Convert from base units to human-readable
+            if (token === 'SOL') {
+                // SOL has 9 decimals (lamports)
+                return (amount / 1000000000).toFixed(9);
+            } else if (token === 'USDC' || token === 'USDT') {
+                // USDC/USDT have 6 decimals
+                return (amount / 1000000).toFixed(6);
+            }
+            return amount.toString();
+        }
+
+        function parseMemo(memo) {
+            // Memo format: [size] fuego|{token}|f:{from}|t:{to}|a:{amount}|yid:{yid}|n:{notes}
+            const parsed = {
+                token: 'unknown',
+                from: '',
+                to: '',
+                amount: '0',
+                yid: '',
+                notes: ''
+            };
+
+            if (!memo) return parsed;
+
+            // Remove [size] prefix if present (e.g., "[130] fuego|...")
+            let cleanMemo = memo;
+            const bracketMatch = memo.match(/^\[\d+\]\s*/);
+            if (bracketMatch) {
+                cleanMemo = memo.substring(bracketMatch[0].length);
+            }
+
+            const parts = cleanMemo.split('|');
+            if (parts.length < 3) return parsed;
+
+            parsed.token = parts[1] || 'unknown';
+
+            // Parse key-value pairs
+            for (let i = 2; i < parts.length; i++) {
+                const part = parts[i];
+                if (part.startsWith('f:')) {
+                    parsed.from = part.substring(2);
+                } else if (part.startsWith('t:')) {
+                    parsed.to = part.substring(2);
+                } else if (part.startsWith('a:')) {
+                    parsed.amount = part.substring(2);
+                } else if (part.startsWith('yid:')) {
+                    parsed.yid = part.substring(4);
+                } else if (part.startsWith('n:')) {
+                    parsed.notes = part.substring(2);
+                }
+            }
+
+            return parsed;
+        }
+
+        async function loadTransactions(address) {
+            const container = document.getElementById('txList');
+            
+            try {
+                const res = await fetch(`${API_URL}/transaction-history`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ network: NETWORK, address, limit: 10 })
+                });
+                
+                if (!res.ok) {
+                    console.log('Transaction fetch failed:', res.status);
+                    return;
+                }
+
+                const data = await res.json();
+                console.log('get_fuego_transactions response:', JSON.stringify(data, null, 2));
+
+                if (!data.success || !data.data || data.data.length === 0) {
+                    return;
+                }
+
+                let html = '';
+                data.data.forEach(txSig => {
+                    // Parse the memo to extract transaction details
+                    const memo = txSig.memo || '';
+                    const tx = parseMemo(memo);
+                    
+                    const isOutgoing = tx.from === address;
+                    const fromFormatted = formatAddress(tx.from);
+                    const toFormatted = formatAddress(tx.to);
+                    
+                    // Format timestamp properly
+                    let timestamp = '';
+                    if (txSig.blockTime) {
+                        const date = new Date(txSig.blockTime * 1000);
+                        timestamp = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+                    
+                    // Status badge
+                    const isFinalized = txSig.confirmationStatus === 'finalized';
+                    const statusBadge = isFinalized 
+                        ? '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">✓ Finalized</span>'
+                        : '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">Pending</span>';
+                    
+                    const txIcon = getTxIcon(isOutgoing);
+                    const tokenIcon = getTokenIcon(tx.token);
+                    const direction = isOutgoing ? 'Sent' : 'Received';
+                    
+                    // Format amount with proper decimals and currency
+                    const humanAmount = formatAmount(tx.amount, tx.token);
+                    let formattedAmount = humanAmount;
+                    if (tx.token === 'USDC' || tx.token === 'USDT') {
+                        formattedAmount = '$' + humanAmount;
+                    }
+                    
+                    html += `
+                        <div class="tx-item">
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <span style="font-size: 20px;">${txIcon}</span>
+                                <div class="tx-info">
+                                    <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center;">
+                                        ${direction} ${formattedAmount} ${tx.token}${statusBadge}
+                                    </div>
+                                    <div class="tx-signature" style="margin-top: 2px;">${txSig.signature.substring(0, 16)}...</div>
+                                    <div class="tx-detail" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
+                                        From: ${fromFormatted} • To: ${toFormatted}
+                                    </div>
+                                    <div class="tx-time" style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        ${timestamp}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tx-link">
+                                <a href="https://explorer.solana.com/tx/${txSig.signature}?cluster=${NETWORK}" target="_blank">View</a>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (html) container.innerHTML = html;
+            } catch (error) {
+                // Silently fail - endpoint not ready
+            }
+        }
+
+        function copyAddress() {
+            const address = document.getElementById('address').textContent;
+            navigator.clipboard.writeText(address).then(() => {
+                const btn = event.target;
+                const original = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = original;
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        function showError(message) {
+            document.getElementById('error').innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        // Theme Management with Toggle
+        function setTheme(mode) {
+            const isDark = mode === 'dark';
+            
+            if (isDark) {
+                // Fire Theme (Dark + Golden)
+                document.documentElement.style.setProperty('--bg-primary', '#1a1a1a');
+                document.documentElement.style.setProperty('--bg-secondary', '#242424');
+                document.documentElement.style.setProperty('--bg-tertiary', '#2d2d2d');
+                document.documentElement.style.setProperty('--text-primary', '#f5f5f5');
+                document.documentElement.style.setProperty('--text-secondary', '#a8a8a8');
+                document.documentElement.style.setProperty('--border-color', '#333333');
+                document.documentElement.style.setProperty('--accent-primary', '#fbbf24');
+                document.documentElement.style.setProperty('--accent-secondary', '#f59e0b');
+            } else {
+                // Light Theme
+                document.documentElement.style.setProperty('--bg-primary', '#ffffff');
+                document.documentElement.style.setProperty('--bg-secondary', '#f8f9fa');
+                document.documentElement.style.setProperty('--bg-tertiary', '#eef0f3');
+                document.documentElement.style.setProperty('--text-primary', '#1a1a1a');
+                document.documentElement.style.setProperty('--text-secondary', '#6b7280');
+                document.documentElement.style.setProperty('--border-color', '#e5e7eb');
+                document.documentElement.style.setProperty('--accent-primary', '#f59e0b');
+                document.documentElement.style.setProperty('--accent-secondary', '#d97706');
+            }
+            
+            localStorage.setItem('fuego_theme_mode', mode);
+            updateThemeButton(mode);
+        }
+
+        function toggleTheme() {
+            const current = localStorage.getItem('fuego_theme_mode') || 'light';
+            const newMode = current === 'light' ? 'dark' : 'light';
+            setTheme(newMode);
+        }
+
+        function updateThemeButton(mode) {
+            const btn = document.getElementById('themeToggle');
+            if (btn) {
+                btn.textContent = mode === 'light' ? '🌙 Dark' : '☀️ Light';
+            }
+        }
+
+        function initTheme() {
+            const saved = localStorage.getItem('fuego_theme_mode') || 'light';
+            setTheme(saved);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>
