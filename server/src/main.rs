@@ -226,6 +226,21 @@ async fn build_transfer_usdc(
     State(_state): State<AppState>,
     Json(payload): Json<TransferUsdcRequest>,
 ) -> Response {
+    // Fetch fresh blockhash
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let blockhash = match rpc.get_latest_blockhash() {
+        Ok(bh) => bh,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to fetch blockhash: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
     // Parse addresses
     let from_pubkey = match string_to_pub_key(&payload.from_address) {
         Ok(pk) => pk,
@@ -312,10 +327,11 @@ async fn build_transfer_usdc(
             .unwrap_or(0)
     );
 
-    // Create transaction message
-    let message = Message::new(
+    // Create transaction message with fresh blockhash
+    let message = Message::new_with_blockhash(
         &[compute_limit, unit_price, transfer_instruction, memo_instruction],
         Some(&from_pubkey),
+        &blockhash,
     );
 
     let transaction = Transaction::new_unsigned(message);
@@ -338,6 +354,7 @@ async fn build_transfer_usdc(
             "transaction": serde_json::Value::String(
                 base64::encode(&serialized_tx)
             ),
+            "blockhash": blockhash.to_string(),
             "from": payload.from_address,
             "to": payload.to_address,
             "amount": payload.amount,
