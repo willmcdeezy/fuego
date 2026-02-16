@@ -33,9 +33,24 @@ Solana RPC (mainnet-beta)
 
 ---
 
-## Quick Start
+## Quick Start (For Agents)
 
-### 1. Download Fuego
+### 1. Get Your Wallet Address
+
+When setting up Fuego, agents should **always send the wallet address as a solo message** for easy copy/paste:
+
+```
+Agent: "What's my Fuego wallet address?"
+```
+
+**Response should be**:
+```
+FgbVaHht1zSBtFUNGDu6E4BkVBuGXWhpS8JeFpCGEquL
+```
+
+Then in next message, provide onramp options (see Deposits below).
+
+### 2. Download Fuego
 
 ```bash
 # Clone the repo with all scripts
@@ -43,7 +58,7 @@ git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 ```
 
-### 2. Download Pre-Compiled Server Binary
+### 3. Download Pre-Compiled Server Binary
 
 Get the latest server binary from GitHub releases (no building required):
 
@@ -63,12 +78,36 @@ curl -L https://github.com/willmcdeezy/fuego/releases/download/v0.1.0/fuego-serv
 # Output: 🔥 Fuego server running on http://127.0.0.1:8080
 ```
 
-### 4. Use Python or TypeScript to Sign & Submit
+### 4. Open Dashboard (Check Balances)
+
+Open `dashboard.html` in your browser:
+
+```bash
+# macOS
+open dashboard.html
+
+# Linux
+firefox dashboard.html
+
+# Windows
+start dashboard.html
+```
+
+Or open in browser: `file:///path/to/fuego/dashboard.html`
+
+**Dashboard shows**:
+- SOL balance
+- USDC balance
+- USDT balance
+- Links to MoonPay for deposits
+- Direct wallet address for manual transfers
+
+### 5. Use Python or TypeScript to Sign & Submit
 
 **Python** (simplest for agents):
 ```bash
 pip install solders base58
-python3 scripts/sign_and_submit.py
+python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 10.5
 ```
 
 **TypeScript** (if you prefer):
@@ -76,6 +115,52 @@ python3 scripts/sign_and_submit.py
 npm install
 npm run sign-and-submit
 ```
+
+---
+
+## Deposits: Get SOL or Stablecoins 💰
+
+**Agent UX Pattern**: When user asks to deposit, respond with address in **solo message**, then onramp options in next message.
+
+### Best Onramps
+
+**1. MoonPay (Recommended - Fastest)**
+- Supports: Credit card, debit card, Apple Pay, Google Pay
+- Speed: 1-5 minutes
+- Coverage: 160+ countries
+- Link: `https://buy.moonpay.com/?currencyCode=sol&walletAddress={ADDRESS}`
+- Can buy: SOL, USDC, USDT
+
+**2. Direct Wallet Transfer (if user has crypto elsewhere)**
+- Speed: 5-30 seconds
+- Cost: Minimal network fee
+- How: Copy your address from dashboard, send SOL/USDC/USDT from any wallet
+
+**3. Coinbase / Kraken (if user has account)**
+- Withdraw to Solana address
+- May take 10-30 minutes
+- Lower fees than MoonPay
+
+**4. Magic Eden Launchpad**
+- If user has existing SOL, can buy tokens
+- Or use to bridge from other chains
+
+### Recommended Flow for Agents
+
+```
+User: "I want to deposit SOL"
+Agent: "FgbVaHht1zSBtFUNGDu6E4BkVBuGXWhpS8JeFpCGEquL"
+[one message with address only - easy copy/paste]
+
+Agent: "Options to deposit:
+1️⃣ MoonPay (fastest): https://buy.moonpay.com/...
+2️⃣ From your exchange (Coinbase, Kraken)
+3️⃣ Direct transfer if you have crypto
+4️⃣ Open dashboard.html to see live balance"
+```
+
+**Key principle**: Address **alone in message** → Options in **next message**.
+Makes it easy for users to copy without other text getting selected.
 
 ---
 
@@ -180,6 +265,16 @@ curl -X POST http://127.0.0.1:8080/usdc-balance \
   }'
 ```
 
+**Get USDT Balance**:
+```bash
+curl -X POST http://127.0.0.1:8080/usdt-balance \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "address": "YOUR_ADDRESS"
+  }'
+```
+
 **Get Latest Blockhash**:
 ```bash
 curl -X POST http://127.0.0.1:8080/latest-hash \
@@ -211,6 +306,19 @@ curl -X POST http://127.0.0.1:8080/build-transfer-sol \
     "from_address": "...",
     "to_address": "...",
     "amount": "0.1",
+    "yid": "unique-tx-id"
+  }'
+```
+
+**Build USDT Transfer**:
+```bash
+curl -X POST http://127.0.0.1:8080/build-transfer-usdt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "from_address": "...",
+    "to_address": "...",
+    "amount": "100",
     "yid": "unique-tx-id"
   }'
 ```
@@ -348,13 +456,43 @@ Want to contribute or modify Fuego?
 
 ---
 
+## Agent Communication Best Practices
+
+When helping users with Fuego, follow this pattern:
+
+### Showing Wallet Address
+**Always solo message** (makes copy/paste easier):
+```
+Agent: "Your Fuego wallet address:"
+
+User clicks → Easy to copy just the address
+
+[Next message with options]
+```
+
+**NOT** (hard to copy, text gets selected):
+```
+Your wallet: FgbVaHht1zSBtFUNGDu6E4BkVBuGXWhpS8JeFpCGEquL
+Here's your address! Send SOL or USDC to this...
+```
+
+### Offering Deposit Options
+Separate address from options:
+1. **First message**: Address only
+2. **Second message**: "Want to deposit? Options are..."
+
+This follows UX best practice of not cluttering critical info.
+
+---
+
 ## What's Next?
 
 - [ ] Hardware wallet support (Ledger/Trezor)
 - [ ] Transaction history + audit logs
-- [ ] Multi-token support (PYUSD, custom SPL)
+- [ ] PYUSD support (Token-2022)
 - [ ] Batch operations
 - [ ] Docker container for server
+- [ ] Agent integration templates
 
 ---
 

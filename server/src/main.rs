@@ -23,6 +23,7 @@ use utils::string_to_pub_key;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDT_MINT: &str = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenEqw";
 
 #[derive(Serialize, Deserialize)]
 struct RpcNetwork {
@@ -62,6 +63,19 @@ struct TransferSolRequest {
     from_address: String,
     to_address: String,
     amount: String, // String to preserve decimals (in SOL)
+    yid: String, // Yield ID for tracking
+    #[serde(default)]
+    notes: Option<String>, // Optional memo notes (max 16 chars)
+    #[serde(default)]
+    fee_amount: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TransferUsdtRequest {
+    network: String,
+    from_address: String,
+    to_address: String,
+    amount: String, // String to preserve decimals
     yid: String, // Yield ID for tracking
     #[serde(default)]
     notes: Option<String>, // Optional memo notes (max 16 chars)
@@ -243,6 +257,59 @@ async fn get_usdc_balance(
         Err(e) => Json(json!({
             "success": false,
             "error": format!("Failed to get USDC balance: {}", e)
+        }))
+        .into_response(),
+    }
+}
+
+async fn get_usdt_balance(
+    State(_state): State<AppState>,
+    Json(payload): Json<GetTokenBalanceRequest>,
+) -> Response {
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let commitment = get_commitment_config(&payload.commitment);
+    let rpc = RpcClient::new_with_commitment(rpc_url, commitment);
+
+    let pubkey = match string_to_pub_key(&payload.address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid wallet address"
+            }))
+            .into_response();
+        }
+    };
+
+    let usdt_mint = match string_to_pub_key(USDT_MINT) {
+        Ok(mint) => mint,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to parse USDT mint"
+            }))
+            .into_response();
+        }
+    };
+
+    let associated_token_account = get_associated_token_address(&pubkey, &usdt_mint);
+
+    match rpc.get_token_account_balance(&associated_token_account) {
+        Ok(balance) => Json(json!({
+            "success": true,
+            "data": {
+                "address": payload.address,
+                "amount": balance.amount,
+                "decimals": balance.decimals,
+                "ui_amount": balance.ui_amount_string,
+                "network": payload.network,
+                "token": "USDT"
+            }
+        }))
+        .into_response(),
+        Err(e) => Json(json!({
+            "success": false,
+            "error": format!("Failed to get USDT balance: {}", e)
         }))
         .into_response(),
     }
@@ -518,6 +585,129 @@ async fn build_transfer_sol(
     .into_response()
 }
 
+async fn build_transfer_usdt(
+    State(_state): State<AppState>,
+    Json(payload): Json<TransferUsdtRequest>,
+) -> Response {
+    // Fetch fresh blockhash
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let blockhash = match rpc.get_latest_blockhash() {
+        Ok(bh) => bh,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to fetch blockhash: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    // Parse addresses
+    let from_pubkey = match string_to_pub_key(&payload.from_address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid from_address"
+            }))
+            .into_response();
+        }
+    };
+
+    let to_pubkey = match string_to_pub_key(&payload.to_address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid to_address"
+            }))
+            .into_response();
+        }
+    };
+
+    let usdt_mint = match string_to_pub_key(USDT_MINT) {
+        Ok(mint) => mint,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid USDT mint"
+            }))
+            .into_response();
+        }
+    };
+
+    // Get associated token accounts
+    let from_ata = get_associated_token_address(&from_pubkey, &usdt_mint);
+    let to_ata = get_associated_token_address(&to_pubkey, &usdt_mint);
+
+    // Parse amount (USDT has 6 decimals)
+    let amount_ui = match payload.amount.parse::<f64>() {
+        Ok(a) => a,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid amount format"
+            }))
+            .into_response();
+        }
+    };
+    let amount = (amount_ui * 1_000_000.0) as u64;
+
+    // Build instructions
+    let compute_limit = ComputeBudgetInstruction::set_compute_unit_limit(300_000);
+    let unit_price = ComputeBudgetInstruction::set_compute_unit_price(100);
+    let transfer_instruction = token_instruction::transfer(
+        &spl_token::id(),
+        &from_ata,
+        &to_ata,
+        &from_pubkey,
+        &[],
+        amount,
+    ).unwrap();
+
+    let memo_text = build_memo("USDT", &payload.from_address, &payload.to_address, amount, &payload.yid, payload.notes.as_deref()).unwrap_or_default();
+    let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[&from_pubkey]);
+
+    let message = Message::new_with_blockhash(
+        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        Some(&from_pubkey),
+        &blockhash,
+    );
+
+    let transaction = Transaction::new_unsigned(message);
+
+    // Serialize transaction
+    let serialized_tx = match bincode::serialize(&transaction) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to serialize transaction"
+            }))
+            .into_response();
+        }
+    };
+
+    Json(json!({
+        "success": true,
+        "data": {
+            "transaction": serde_json::Value::String(
+                base64::encode(&serialized_tx)
+            ),
+            "blockhash": blockhash.to_string(),
+            "from": payload.from_address,
+            "to": payload.to_address,
+            "amount": payload.amount,
+            "yid": payload.yid,
+            "memo": memo_text,
+            "network": payload.network
+        }
+    }))
+    .into_response()
+}
+
 async fn submit_transaction(
     State(_state): State<AppState>,
     Json(payload): Json<SubmitTransactionRequest>,
@@ -609,9 +799,11 @@ async fn main() {
         .route("/latest-hash", post(get_latest_hash))
         .route("/balance", post(get_balance))
         .route("/usdc-balance", post(get_usdc_balance))
+        .route("/usdt-balance", post(get_usdt_balance))
         // TRANSFER endpoints
         .route("/build-transfer-usdc", post(build_transfer_usdc))
         .route("/build-transfer-sol", post(build_transfer_sol))
+        .route("/build-transfer-usdt", post(build_transfer_usdt))
         .route("/submit-transaction", post(submit_transaction))
         // TODO: .route("/pyusd-balance", post(get_pyusd_balance))
         .layer(cors)
@@ -626,9 +818,11 @@ async fn main() {
     println!("    POST /latest-hash - Get latest blockhash");
     println!("    POST /balance - Get SOL balance");
     println!("    POST /usdc-balance - Get USDC balance");
+    println!("    POST /usdt-balance - Get USDT balance");
     println!("  TRANSFER:");
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
+    println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)");
     println!("    POST /submit-transaction - Broadcast signed transaction");
     println!("  TODO:");
     println!("    POST /pyusd-balance - Get PYUSD (Token-2022) balance");

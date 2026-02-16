@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuego Wallet Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-top: 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f, #c44569);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #a0a0a0;
+            font-size: 0.9em;
+        }
+
+        .address-section {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .address-label {
+            font-size: 0.85em;
+            color: #a0a0a0;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .address-display {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            word-break: break-all;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 107, 107, 0.2);
+        }
+
+        .address-display:hover {
+            background: rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 107, 107, 0.5);
+        }
+
+        .copy-hint {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .balance-grid {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .balance-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .balance-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .balance-card.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .balance-card.error {
+            background: rgba(255, 107, 107, 0.1);
+            border-color: rgba(255, 107, 107, 0.3);
+        }
+
+        .token-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .token-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .token-sol .token-icon {
+            background: rgba(159, 168, 218, 0.2);
+            color: #9fa8da;
+        }
+
+        .token-usdc .token-icon {
+            background: rgba(46, 124, 217, 0.2);
+            color: #2e7cd9;
+        }
+
+        .token-usdt .token-icon {
+            background: rgba(38, 174, 96, 0.2);
+            color: #26ae60;
+        }
+
+        .token-details h3 {
+            font-size: 0.95em;
+            margin-bottom: 3px;
+        }
+
+        .token-details .network {
+            font-size: 0.75em;
+            color: #888;
+        }
+
+        .balance-amount {
+            text-align: right;
+        }
+
+        .balance-amount .amount {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .balance-amount .usd {
+            font-size: 0.85em;
+            color: #a0a0a0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 107, 107, 0.3);
+            border-radius: 50%;
+            border-top-color: #ff6b6b;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            font-size: 0.85em;
+            margin-top: 8px;
+        }
+
+        .onramp-section {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .onramp-section h3 {
+            margin-bottom: 12px;
+            color: #26ae60;
+        }
+
+        .onramp-buttons {
+            display: grid;
+            gap: 10px;
+        }
+
+        .onramp-btn {
+            padding: 12px;
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.4);
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        .onramp-btn:hover {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: rgba(76, 175, 80, 0.6);
+            transform: translateY(-1px);
+        }
+
+        .footer {
+            text-align: center;
+            color: #666;
+            font-size: 0.85em;
+            margin-top: 40px;
+            padding-bottom: 20px;
+        }
+
+        .footer a {
+            color: #ff6b6b;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .settings {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-label {
+            font-size: 0.85em;
+            color: #a0a0a0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .settings input {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .settings input::placeholder {
+            color: #666;
+        }
+
+        .success-message {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 8px;
+            color: #26ae60;
+            font-size: 0.85em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔥 Fuego</h1>
+            <p class="subtitle">Solana Wallet Dashboard</p>
+        </header>
+
+        <div class="settings">
+            <div class="settings-label">Wallet Address</div>
+            <input 
+                type="text" 
+                id="addressInput" 
+                placeholder="Enter your Solana wallet address or load from wallet.json"
+                value=""
+            >
+            <button onclick="loadAddress()" style="
+                width: 100%;
+                padding: 8px;
+                margin-top: 8px;
+                background: rgba(255, 107, 107, 0.2);
+                border: 1px solid rgba(255, 107, 107, 0.4);
+                border-radius: 6px;
+                color: #fff;
+                cursor: pointer;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='rgba(255, 107, 107, 0.3)'" onmouseout="this.style.background='rgba(255, 107, 107, 0.2)'">
+                Load Balances
+            </button>
+        </div>
+
+        <div class="address-section" id="addressSection" style="display: none;">
+            <div class="address-label">📋 Your Address</div>
+            <div class="address-display" id="addressDisplay" onclick="copyAddress()"></div>
+            <div class="copy-hint">Click to copy • Share to receive funds</div>
+            <div class="success-message" id="copySuccess" style="display: none;">✓ Copied to clipboard!</div>
+        </div>
+
+        <div class="onramp-section" id="onrampSection" style="display: none;">
+            <h3>💰 Need SOL or Stablecoin?</h3>
+            <div class="onramp-buttons">
+                <a class="onramp-btn" id="moonpayLink" target="_blank">
+                    Buy via MoonPay
+                </a>
+                <button class="onramp-btn" onclick="showDirectTransfer()" style="
+                    background: rgba(100, 150, 200, 0.2);
+                    border-color: rgba(100, 150, 200, 0.4);
+                ">
+                    📤 Direct Transfer (Paste address above)
+                </button>
+            </div>
+        </div>
+
+        <div class="balance-grid" id="balances">
+            <div class="balance-card">
+                <div class="token-info">
+                    <div class="token-icon">⚙️</div>
+                    <div class="token-details">
+                        <h3>Initializing...</h3>
+                        <div class="network">mainnet-beta</div>
+                    </div>
+                </div>
+                <div class="balance-amount">
+                    <div style="font-size: 0.9em; color: #888;">Enter wallet address to start</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Fuego • <a href="https://github.com/willmcdeezy/fuego" target="_blank">GitHub</a> • <a href="https://explorer.solana.com" target="_blank">Solana Explorer</a></p>
+            <p style="margin-top: 10px; color: #555;">Server: <span id="serverStatus">Checking...</span></p>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://127.0.0.1:8080';
+        const TOKENS = {
+            SOL: { icon: '◎', label: 'Solana' },
+            USDC: { icon: '₤', label: 'USD Coin' },
+            USDT: { icon: '₮', label: 'Tether USD' }
+        };
+
+        // Check server status
+        async function checkServer() {
+            try {
+                const res = await fetch(`${SERVER_URL}/health`);
+                const status = res.ok ? '🟢 Connected' : '🔴 Offline';
+                document.getElementById('serverStatus').textContent = status;
+            } catch (e) {
+                document.getElementById('serverStatus').textContent = '🔴 Offline';
+            }
+        }
+
+        // Load address from input
+        async function loadAddress() {
+            const address = document.getElementById('addressInput').value.trim();
+            if (!address) {
+                alert('Please enter a wallet address');
+                return;
+            }
+
+            // Show address section
+            document.getElementById('addressSection').style.display = 'block';
+            document.getElementById('addressDisplay').textContent = address;
+            document.getElementById('onrampSection').style.display = 'block';
+
+            // Update MoonPay link
+            const moonpayLink = `https://buy.moonpay.com/?currencyCode=sol&walletAddress=${encodeURIComponent(address)}`;
+            document.getElementById('moonpayLink').href = moonpayLink;
+
+            // Load balances
+            await loadBalances(address);
+        }
+
+        // Load all balances
+        async function loadBalances(address) {
+            const balancesEl = document.getElementById('balances');
+            balancesEl.innerHTML = '';
+
+            // Fetch SOL balance
+            await fetchBalance(address, 'SOL', 'balance');
+
+            // Fetch USDC balance
+            await fetchBalance(address, 'USDC', 'usdc-balance');
+
+            // Fetch USDT balance
+            await fetchBalance(address, 'USDT', 'usdt-balance');
+        }
+
+        // Fetch individual balance
+        async function fetchBalance(address, token, endpoint) {
+            const balancesEl = document.getElementById('balances');
+            const tokenInfo = TOKENS[token];
+
+            const card = document.createElement('div');
+            card.className = `balance-card token-${token.toLowerCase()} loading`;
+            card.innerHTML = `
+                <div class="token-info">
+                    <div class="token-icon">${tokenInfo.icon}</div>
+                    <div class="token-details">
+                        <h3>${token}</h3>
+                        <div class="network">${tokenInfo.label}</div>
+                    </div>
+                </div>
+                <div class="balance-amount">
+                    <div class="spinner"></div>
+                </div>
+            `;
+            balancesEl.appendChild(card);
+
+            try {
+                const payload = {
+                    network: 'mainnet-beta',
+                    address: address
+                };
+
+                const res = await fetch(`${SERVER_URL}/${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    const amount = token === 'SOL' 
+                        ? (data.data.sol || 0)
+                        : (parseFloat(data.data.ui_amount) || 0);
+
+                    card.classList.remove('loading');
+                    card.innerHTML = `
+                        <div class="token-info">
+                            <div class="token-icon">${tokenInfo.icon}</div>
+                            <div class="token-details">
+                                <h3>${token}</h3>
+                                <div class="network">${tokenInfo.label}</div>
+                            </div>
+                        </div>
+                        <div class="balance-amount">
+                            <div class="amount">${amount.toFixed(2)}</div>
+                            <div class="usd">${tokenInfo.label}</div>
+                        </div>
+                    `;
+                } else {
+                    card.classList.add('error');
+                    card.classList.remove('loading');
+                    card.innerHTML = `
+                        <div class="token-info">
+                            <div class="token-icon">${tokenInfo.icon}</div>
+                            <div class="token-details">
+                                <h3>${token}</h3>
+                                <div class="network">${tokenInfo.label}</div>
+                            </div>
+                        </div>
+                        <div class="balance-amount">
+                            <div class="error-message">No account</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                card.classList.add('error');
+                card.classList.remove('loading');
+                card.innerHTML = `
+                    <div class="token-info">
+                        <div class="token-icon">${tokenInfo.icon}</div>
+                        <div class="token-details">
+                            <h3>${token}</h3>
+                            <div class="network">${tokenInfo.label}</div>
+                        </div>
+                    </div>
+                    <div class="balance-amount">
+                        <div class="error-message">Error loading</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Copy address to clipboard
+        async function copyAddress() {
+            const address = document.getElementById('addressDisplay').textContent;
+            await navigator.clipboard.writeText(address);
+            const successEl = document.getElementById('copySuccess');
+            successEl.style.display = 'block';
+            setTimeout(() => {
+                successEl.style.display = 'none';
+            }, 2000);
+        }
+
+        // Show direct transfer instructions
+        function showDirectTransfer() {
+            const address = document.getElementById('addressDisplay').textContent;
+            alert(`Direct Transfer Instructions:\n\n1. Copy your address above (click the address box)\n2. Send from your wallet:\n   - Address: ${address}\n   - Network: Solana Mainnet\n   - Token: SOL or USDC or USDT\n3. Funds arrive in ~5-30 seconds\n4. Refresh dashboard to see new balance`);
+        }
+
+        // Initialize
+        checkServer();
+    </script>
+</body>
+</html>

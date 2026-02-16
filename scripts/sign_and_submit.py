@@ -155,7 +155,7 @@ def main():
                        help="Destination wallet address")
     parser.add_argument("--amount", required=True,
                        help="Transfer amount (in token units)")
-    parser.add_argument("--token", choices=["USDC", "SOL"], default="USDC",
+    parser.add_argument("--token", choices=["USDC", "SOL", "USDT"], default="USDC",
                        help="Token type (default: USDC)")
     parser.add_argument("--network", default="mainnet-beta",
                        help="Solana network (default: mainnet-beta)")
