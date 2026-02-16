@@ -2,9 +2,8 @@
 target/
 /target/
 
-# Cargo lock files (let server build define versions)
+# Cargo lock files
 Cargo.lock
-server/Cargo.lock
 
 # IDE
 .vscode/
