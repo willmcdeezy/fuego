@@ -59,6 +59,14 @@ struct TransferUsdcRequest {
 }
 
 #[derive(Serialize, Deserialize)]
+struct SubmitTransactionRequest {
+    network: String,
+    transaction: String, // Base64-encoded signed transaction
+    #[serde(default)]
+    commitment: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
 struct BalanceResponse {
     lamports: u64,
     sol: f64,
@@ -357,6 +365,56 @@ async fn build_transfer_usdc(
     .into_response()
 }
 
+async fn submit_transaction(
+    State(_state): State<AppState>,
+    Json(payload): Json<SubmitTransactionRequest>,
+) -> Response {
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    // Decode base64 transaction
+    let tx_bytes = match base64::decode(&payload.transaction) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to decode transaction - invalid base64"
+            }))
+            .into_response();
+        }
+    };
+
+    // Deserialize transaction
+    let transaction: Transaction = match bincode::deserialize(&tx_bytes) {
+        Ok(tx) => tx,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to deserialize transaction"
+            }))
+            .into_response();
+        }
+    };
+
+    // Submit to RPC
+    match rpc.send_transaction(&transaction) {
+        Ok(signature) => Json(json!({
+            "success": true,
+            "data": {
+                "signature": signature.to_string(),
+                "network": payload.network,
+                "status": "submitted"
+            }
+        }))
+        .into_response(),
+        Err(e) => Json(json!({
+            "success": false,
+            "error": format!("Failed to submit transaction: {}", e)
+        }))
+        .into_response(),
+    }
+}
+
 // TODO: PYUSD balance endpoint using Token-2022
 // Requires getTokenAccountsByOwner implementation
 // Issue: Standard ATA derivation doesn't work for Token-2022
@@ -392,9 +450,9 @@ async fn main() {
         .route("/usdc-balance", post(get_usdc_balance))
         // TRANSFER endpoints
         .route("/build-transfer-usdc", post(build_transfer_usdc))
+        .route("/submit-transaction", post(submit_transaction))
         // TODO: .route("/pyusd-balance", post(get_pyusd_balance))
         // TODO: .route("/build-transfer-sol", post(build_transfer_sol))
-        // TODO: .route("/submit-transaction", post(submit_transaction))
         .layer(cors)
         .with_state(state);
 
@@ -409,9 +467,9 @@ async fn main() {
     println!("    POST /usdc-balance - Get USDC balance");
     println!("  TRANSFER:");
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
+    println!("    POST /submit-transaction - Broadcast signed transaction");
     println!("  TODO:");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer");
-    println!("    POST /submit-transaction - Broadcast signed transaction");
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
