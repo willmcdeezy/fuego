@@ -356,18 +356,6 @@ async fn submit_transaction(
     let rpc_url = format!("https://api.{}.solana.com", payload.network);
     let rpc = RpcClient::new(rpc_url);
 
-    // Fetch fresh blockhash
-    let blockhash = match rpc.get_latest_blockhash() {
-        Ok(bh) => bh,
-        Err(e) => {
-            return Json(json!({
-                "success": false,
-                "error": format!("Failed to fetch blockhash: {}", e)
-            }))
-            .into_response();
-        }
-    };
-
     // Decode base64 transaction
     let tx_bytes = match base64::decode(&payload.transaction) {
         Ok(bytes) => bytes,
@@ -380,8 +368,8 @@ async fn submit_transaction(
         }
     };
 
-    // Deserialize transaction
-    let mut transaction: Transaction = match bincode::deserialize(&tx_bytes) {
+    // Deserialize transaction (already signed with correct blockhash by agent)
+    let transaction: Transaction = match bincode::deserialize(&tx_bytes) {
         Ok(tx) => tx,
         Err(_) => {
             return Json(json!({
@@ -392,10 +380,7 @@ async fn submit_transaction(
         }
     };
 
-    // Update message with fresh blockhash
-    transaction.message.recent_blockhash = blockhash;
-
-    // Submit to RPC
+    // Submit to RPC (transaction is already signed with valid blockhash)
     match rpc.send_transaction(&transaction) {
         Ok(signature) => Json(json!({
             "success": true,
