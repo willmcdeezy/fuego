@@ -226,6 +226,21 @@ async fn build_transfer_usdc(
     State(_state): State<AppState>,
     Json(payload): Json<TransferUsdcRequest>,
 ) -> Response {
+    // Fetch blockhash at build time for agent to use
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let blockhash = match rpc.get_latest_blockhash() {
+        Ok(bh) => bh,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to fetch blockhash: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
     // Parse addresses
     let from_pubkey = match string_to_pub_key(&payload.from_address) {
         Ok(pk) => pk,
@@ -338,6 +353,7 @@ async fn build_transfer_usdc(
             "transaction": serde_json::Value::String(
                 base64::encode(&serialized_tx)
             ),
+            "blockhash": blockhash.to_string(),
             "from": payload.from_address,
             "to": payload.to_address,
             "amount": payload.amount,
@@ -368,7 +384,7 @@ async fn submit_transaction(
         }
     };
 
-    // Deserialize transaction (already signed with correct blockhash by agent)
+    // Deserialize transaction (already signed by agent with correct blockhash)
     let transaction: Transaction = match bincode::deserialize(&tx_bytes) {
         Ok(tx) => tx,
         Err(_) => {
@@ -380,7 +396,7 @@ async fn submit_transaction(
         }
     };
 
-    // Submit to RPC (transaction is already signed with valid blockhash)
+    // Submit to RPC (transaction is already signed with correct blockhash)
     match rpc.send_transaction(&transaction) {
         Ok(signature) => Json(json!({
             "success": true,
