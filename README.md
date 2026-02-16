@@ -1,5 +1,6 @@
 <div align="center">
   <img src="fuego-logo.jpg" alt="Fuego Logo" width="120" style="border-radius: 24px;">
+  <h1>Fuego</h1>
   <h3>🔥 The Agent Solana Wallet 🔥</h3>
   <p>Automated. Fast. Secure.</p>
 </div>
