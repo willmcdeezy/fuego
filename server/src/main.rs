@@ -226,21 +226,6 @@ async fn build_transfer_usdc(
     State(_state): State<AppState>,
     Json(payload): Json<TransferUsdcRequest>,
 ) -> Response {
-    // Fetch blockhash at build time for agent to use
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
-
-    let blockhash = match rpc.get_latest_blockhash() {
-        Ok(bh) => bh,
-        Err(e) => {
-            return Json(json!({
-                "success": false,
-                "error": format!("Failed to fetch blockhash: {}", e)
-            }))
-            .into_response();
-        }
-    };
-
     // Parse addresses
     let from_pubkey = match string_to_pub_key(&payload.from_address) {
         Ok(pk) => pk,
@@ -353,7 +338,6 @@ async fn build_transfer_usdc(
             "transaction": serde_json::Value::String(
                 base64::encode(&serialized_tx)
             ),
-            "blockhash": blockhash.to_string(),
             "from": payload.from_address,
             "to": payload.to_address,
             "amount": payload.amount,
@@ -372,6 +356,18 @@ async fn submit_transaction(
     let rpc_url = format!("https://api.{}.solana.com", payload.network);
     let rpc = RpcClient::new(rpc_url);
 
+    // Fetch fresh blockhash
+    let blockhash = match rpc.get_latest_blockhash() {
+        Ok(bh) => bh,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to fetch blockhash: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
     // Decode base64 transaction
     let tx_bytes = match base64::decode(&payload.transaction) {
         Ok(bytes) => bytes,
@@ -384,8 +380,8 @@ async fn submit_transaction(
         }
     };
 
-    // Deserialize transaction (already signed by agent with correct blockhash)
-    let transaction: Transaction = match bincode::deserialize(&tx_bytes) {
+    // Deserialize transaction
+    let mut transaction: Transaction = match bincode::deserialize(&tx_bytes) {
         Ok(tx) => tx,
         Err(_) => {
             return Json(json!({
@@ -396,7 +392,10 @@ async fn submit_transaction(
         }
     };
 
-    // Submit to RPC (transaction is already signed with correct blockhash)
+    // Update message with fresh blockhash
+    transaction.message.recent_blockhash = blockhash;
+
+    // Submit to RPC
     match rpc.send_transaction(&transaction) {
         Ok(signature) => Json(json!({
             "success": true,
