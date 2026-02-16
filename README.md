@@ -7,13 +7,27 @@
 ## 🚀 Quick Start (5 minutes)
 
 ### 1. Download Binary (No Build Required)
-```bash
-# macOS / Linux
-curl -L https://github.com/willmcdeezy/fuego/releases/download/v0.1.0/fuego-server -o fuego-server
-chmod +x fuego-server
 
-# Windows
-curl -L https://github.com/willmcdeezy/fuego/releases/download/v0.1.0/fuego-server.exe -o fuego-server.exe
+**Option A: Latest from main branch** (what we committed)
+```bash
+git clone https://github.com/willmcdeezy/fuego.git
+cd fuego
+./fuego-server  # Already executable!
+```
+
+**Option B: Download from Releases** (v0.1.0+)
+Choose your platform:
+- **Linux x86_64**: `fuego-server-x86_64-unknown-linux-gnu`
+- **Linux ARM64**: (commit the one we added)
+- **Windows**: `fuego-server-x86_64-pc-windows-msvc.exe`
+- **macOS Intel**: `fuego-server-x86_64-apple-darwin`
+- **macOS Apple Silicon**: `fuego-server-aarch64-apple-darwin`
+
+```bash
+# Example: macOS Apple Silicon
+curl -L https://github.com/willmcdeezy/fuego/releases/download/v0.1.0/fuego-server-aarch64-apple-darwin -o fuego-server
+chmod +x fuego-server
+./fuego-server
 ```
 
 ### 2. Start Server
@@ -90,6 +104,31 @@ Client Wallet (TypeScript / Python)
 ```
 
 **Key security property**: Private keys stay on your machine. Server is a pure RPC proxy.
+
+---
+
+## 🔄 Automated Multi-Platform Releases
+
+When you tag a release, **GitHub Actions automatically builds binaries for all platforms**:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+This triggers `.github/workflows/release.yml` which:
+1. ✅ Builds on Linux, Windows, macOS (Intel + Apple Silicon)
+2. ✅ Uploads all binaries to GitHub Releases
+3. ✅ Tagged with platform (e.g., `fuego-server-x86_64-apple-darwin`)
+
+Users then download the binary for their OS — no build step needed!
+
+**Supported platforms:**
+- Linux x86_64
+- Linux ARM64 (aarch64)
+- Windows x86_64
+- macOS Intel (x86_64)
+- macOS Apple Silicon (aarch64)
 
 ---
 
