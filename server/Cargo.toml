@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "net"] }
 tower-http = { version = "0.5.2", features = ["cors"] }
 axum = "0.7.5"
 serde_json = "1.0.115"
@@ -14,6 +14,9 @@ solana-sdk = "2.0.7"
 spl-associated-token-account = "4.0.0"
 spl-token = "6.0.0"
 spl-memo = "5.0.0"
-chrono = { version = "0.4.34", features = ["serde", "clock"] }
 base64 = "0.22.0"
 bincode = "1.3.3"
+
+# Override transitive dependency to avoid unstable edition2024 requirement
+[patch.crates-io]
+constant_time_eq = "0.3.0"
