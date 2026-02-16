@@ -23,10 +23,6 @@ use utils::string_to_pub_key;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-// Try alternate PYUSD mints - could be either address depending on network
-const PYUSD_MINT: &str = "PyUvTEBjM1yGH3FPz8fs9cTSMUq534YEGU3RLWQ5o9t"; // Token-2022
-const PYUSD_MINT_ALT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo"; // Alternative
-const TOKEN_PROGRAM_2022: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
 #[derive(Serialize, Deserialize)]
 struct RpcNetwork {
