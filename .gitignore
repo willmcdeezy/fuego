@@ -1,0 +1,27 @@
+# Build artifacts
+target/
+/target/
+
+# Cargo lock files (let server build define versions)
+Cargo.lock
+server/Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+package-lock.json
+dist/
+
+# Local env
+.env
+.env.local
