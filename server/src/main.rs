@@ -20,6 +20,8 @@ use spl_memo;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 use utils::string_to_pub_key;
+use base64::engine::general_purpose;
+use base64::Engine;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -91,12 +93,14 @@ struct SubmitTransactionRequest {
     commitment: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct BalanceResponse {
     lamports: u64,
     sol: f64,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct TokenBalanceResponse {
     amount: String,
@@ -451,7 +455,7 @@ async fn build_transfer_usdc(
         "success": true,
         "data": {
             "transaction": serde_json::Value::String(
-                base64::encode(&serialized_tx)
+                general_purpose::STANDARD.encode(&serialized_tx)
             ),
             "blockhash": blockhash.to_string(),
             "from": payload.from_address,
@@ -571,7 +575,7 @@ async fn build_transfer_sol(
         "success": true,
         "data": {
             "transaction": serde_json::Value::String(
-                base64::encode(&serialized_tx)
+                general_purpose::STANDARD.encode(&serialized_tx)
             ),
             "blockhash": blockhash.to_string(),
             "from": payload.from_address,
@@ -694,7 +698,7 @@ async fn build_transfer_usdt(
         "success": true,
         "data": {
             "transaction": serde_json::Value::String(
-                base64::encode(&serialized_tx)
+                general_purpose::STANDARD.encode(&serialized_tx)
             ),
             "blockhash": blockhash.to_string(),
             "from": payload.from_address,
@@ -716,7 +720,7 @@ async fn submit_transaction(
     let rpc = RpcClient::new(rpc_url);
 
     // Decode base64 transaction
-    let tx_bytes = match base64::decode(&payload.transaction) {
+    let tx_bytes = match general_purpose::STANDARD.decode(&payload.transaction) {
         Ok(bytes) => bytes,
         Err(_) => {
             return Json(json!({
