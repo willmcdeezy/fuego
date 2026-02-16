@@ -55,6 +55,21 @@ struct TransferUsdcRequest {
     amount: String, // String to preserve decimals
     yid: String, // Yield ID for tracking
     #[serde(default)]
+    notes: Option<String>, // Optional memo notes (max 16 chars)
+    #[serde(default)]
+    fee_amount: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TransferSolRequest {
+    network: String,
+    from_address: String,
+    to_address: String,
+    amount: String, // String to preserve decimals (in SOL)
+    yid: String, // Yield ID for tracking
+    #[serde(default)]
+    notes: Option<String>, // Optional memo notes (max 16 chars)
+    #[serde(default)]
     fee_amount: Option<String>,
 }
 
@@ -91,6 +106,21 @@ fn get_commitment_config(commitment: &Option<String>) -> CommitmentConfig {
         Some("finalized") => CommitmentConfig::finalized(),
         _ => CommitmentConfig::confirmed(),
     }
+}
+
+fn build_memo(token_type: &str, from: &str, to: &str, amount: u64, yid: &str, notes: Option<&str>) -> Result<String, String> {
+    // Validate notes if provided
+    if let Some(n) = notes {
+        if n.len() > 16 {
+            return Err(format!("Notes must be 16 characters or less, got {}", n.len()));
+        }
+    }
+    
+    let notes_part = notes.unwrap_or("");
+    Ok(format!(
+        "fuego|{}|f:{}|t:{}|a:{}|yid:{}|n:{}",
+        token_type, from, to, amount, yid, notes_part
+    ))
 }
 
 async fn health_check() -> impl IntoResponse {
@@ -291,11 +321,17 @@ async fn build_transfer_usdc(
         }
     };
 
-    // Build memo: fuego|f:{from}|t:{to}|a:{amount}|yid:{yid}
-    let memo_text = format!(
-        "fuego|f:{}|t:{}|a:{}|yid:{}",
-        payload.from_address, payload.to_address, amount, payload.yid
-    );
+    // Build memo with new format: fuego|USDC|f:{from}|t:{to}|a:{amount}|yid:{yid}|n:{notes}
+    let memo_text = match build_memo("USDC", &payload.from_address, &payload.to_address, amount, &payload.yid, payload.notes.as_deref()) {
+        Ok(memo) => memo,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": e
+            }))
+            .into_response();
+        }
+    };
 
     // Build instructions
     let transfer_instruction = match token_instruction::transfer(
@@ -316,6 +352,126 @@ async fn build_transfer_usdc(
         }
     };
 
+    let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[]);
+
+    // Compute budget instructions
+    let compute_limit = ComputeBudgetInstruction::set_compute_unit_limit(100_000);
+    let unit_price = ComputeBudgetInstruction::set_compute_unit_price(
+        payload.fee_amount
+            .as_ref()
+            .and_then(|f| f.parse::<u64>().ok())
+            .unwrap_or(0)
+    );
+
+    // Create transaction message with fresh blockhash
+    let message = Message::new_with_blockhash(
+        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        Some(&from_pubkey),
+        &blockhash,
+    );
+
+    let transaction = Transaction::new_unsigned(message);
+
+    // Serialize transaction
+    let serialized_tx = match bincode::serialize(&transaction) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to serialize transaction"
+            }))
+            .into_response();
+        }
+    };
+
+    Json(json!({
+        "success": true,
+        "data": {
+            "transaction": serde_json::Value::String(
+                base64::encode(&serialized_tx)
+            ),
+            "blockhash": blockhash.to_string(),
+            "from": payload.from_address,
+            "to": payload.to_address,
+            "amount": payload.amount,
+            "yid": payload.yid,
+            "memo": memo_text,
+            "network": payload.network
+        }
+    }))
+    .into_response()
+}
+
+async fn build_transfer_sol(
+    State(_state): State<AppState>,
+    Json(payload): Json<TransferSolRequest>,
+) -> Response {
+    // Fetch fresh blockhash
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let blockhash = match rpc.get_latest_blockhash() {
+        Ok(bh) => bh,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to fetch blockhash: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    // Parse addresses
+    let from_pubkey = match string_to_pub_key(&payload.from_address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid from_address"
+            }))
+            .into_response();
+        }
+    };
+
+    let to_pubkey = match string_to_pub_key(&payload.to_address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid to_address"
+            }))
+            .into_response();
+        }
+    };
+
+    // Parse amount (in SOL, convert to lamports)
+    let amount_lamports: u64 = match payload.amount.parse::<f64>() {
+        Ok(val) => (val * 1_000_000_000.0) as u64,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid amount"
+            }))
+            .into_response();
+        }
+    };
+
+    // Build memo with new format: fuego|SOL|f:{from}|t:{to}|a:{amount}|yid:{yid}|n:{notes}
+    let memo_text = match build_memo("SOL", &payload.from_address, &payload.to_address, amount_lamports, &payload.yid, payload.notes.as_deref()) {
+        Ok(memo) => memo,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": e
+            }))
+            .into_response();
+        }
+    };
+
+    // Build instructions
+    use solana_sdk::system_instruction;
+    
+    let transfer_instruction = system_instruction::transfer(&from_pubkey, &to_pubkey, amount_lamports);
     let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[]);
 
     // Compute budget instructions
@@ -451,9 +607,9 @@ async fn main() {
         .route("/usdc-balance", post(get_usdc_balance))
         // TRANSFER endpoints
         .route("/build-transfer-usdc", post(build_transfer_usdc))
+        .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/submit-transaction", post(submit_transaction))
         // TODO: .route("/pyusd-balance", post(get_pyusd_balance))
-        // TODO: .route("/build-transfer-sol", post(build_transfer_sol))
         .layer(cors)
         .with_state(state);
 
@@ -468,9 +624,10 @@ async fn main() {
     println!("    POST /usdc-balance - Get USDC balance");
     println!("  TRANSFER:");
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
+    println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
     println!("    POST /submit-transaction - Broadcast signed transaction");
     println!("  TODO:");
-    println!("    POST /build-transfer-sol - Build unsigned SOL transfer");
+    println!("    POST /pyusd-balance - Get PYUSD (Token-2022) balance");
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
