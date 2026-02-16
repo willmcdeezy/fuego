@@ -551,15 +551,23 @@ async fn submit_transaction(
 
     // Submit to RPC (transaction is already signed with correct blockhash by agent)
     match rpc.send_transaction(&transaction) {
-        Ok(signature) => Json(json!({
-            "success": true,
-            "data": {
-                "signature": signature.to_string(),
-                "network": payload.network,
-                "status": "submitted"
-            }
-        }))
-        .into_response(),
+        Ok(signature) => {
+            let sig_string = signature.to_string();
+            let explorer_link = format!(
+                "https://explorer.solana.com/tx/{}?cluster={}",
+                sig_string, payload.network
+            );
+            Json(json!({
+                "success": true,
+                "data": {
+                    "signature": sig_string,
+                    "explorer_link": explorer_link,
+                    "network": payload.network,
+                    "status": "submitted"
+                }
+            }))
+            .into_response()
+        },
         Err(e) => Json(json!({
             "success": false,
             "error": format!("Failed to submit transaction: {}", e)
