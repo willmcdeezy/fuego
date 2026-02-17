@@ -19,29 +19,23 @@
 
 ## 🚀 Quick Start (5 minutes)
 
-### 1. Download Binary (No Build Required)
+### 1. Build from Source
 
-**Option A: Latest from main branch** (what we committed)
+Fuego is built with Rust for maximum portability. Build it once, run it anywhere!
+
+**Prerequisites:** [Install Rust](https://rustup.rs/)
+
 ```bash
+# Clone and build
 git clone https://github.com/willmcdeezy/fuego.git
-cd fuego
-./fuego-server  # Already executable!
+cd fuego/server
+cargo build --release
+
+# Your binary is ready!
+./target/release/fuego-server
 ```
 
-**Option B: Download from Releases** (v0.1.0+)
-Choose your platform:
-- **Linux x86_64**: `fuego-server-x86_64-unknown-linux-gnu`
-- **Linux ARM64**: (commit the one we added)
-- **Windows**: `fuego-server-x86_64-pc-windows-msvc.exe`
-- **macOS Intel**: `fuego-server-x86_64-apple-darwin`
-- **macOS Apple Silicon**: `fuego-server-aarch64-apple-darwin`
-
-```bash
-# Example: macOS Apple Silicon
-curl -L https://github.com/willmcdeezy/fuego/releases/download/v0.1.0/fuego-server-aarch64-apple-darwin -o fuego-server
-chmod +x fuego-server
-./fuego-server
-```
+**That's it!** No dependencies, no Docker, no fuss. Rust produces a single static binary.
 
 ### 2. Start Server
 ```bash
@@ -123,31 +117,6 @@ Fuego Server (localhost:8080)
 - Agent signs locally with encrypted wallet
 - Agent submits signed transaction back to Fuego Server
 - Fuego Server is the **exclusive broadcaster** to Solana RPC
-
----
-
-## 🔄 Automated Multi-Platform Releases
-
-When you tag a release, **GitHub Actions automatically builds binaries for all platforms**:
-
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-This triggers `.github/workflows/release.yml` which:
-1. ✅ Builds on Linux, Windows, macOS (Intel + Apple Silicon)
-2. ✅ Uploads all binaries to GitHub Releases
-3. ✅ Tagged with platform (e.g., `fuego-server-x86_64-apple-darwin`)
-
-Users then download the binary for their OS — no build step needed!
-
-**Supported platforms:**
-- Linux x86_64
-- Linux ARM64 (aarch64)
-- Windows x86_64
-- macOS Intel (x86_64)
-- macOS Apple Silicon (aarch64)
 
 ---
 
