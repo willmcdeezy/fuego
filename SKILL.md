@@ -572,6 +572,14 @@ python3 scripts/sign_and_submit.py --network devnet
 - Start server: `~/.fuego/server/fuego-server`
 - Dashboard cannot fetch balances without the server running on port 8080
 
+**"Failed to load wallet: No wallet loaded" or signing errors**
+- Wallet is encrypted with a password you set during initialization
+- **Agent cannot auto-sign transactions** - this is by design for security!
+- To send transactions, user must provide their password
+- Use `scripts/sign_and_submit.py` which prompts for password securely
+- **Example:** `python3 scripts/sign_and_submit.py --from <ADDR> --to <ADDR> --amount 0.01 --token USDC`
+- **Note for agents:** Always ask user before requesting wallet password. Never store or log passwords.
+
 ---
 
 ## Development
