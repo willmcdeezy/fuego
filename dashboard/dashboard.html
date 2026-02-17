@@ -476,7 +476,7 @@
                     html += `
                         <div class="balance-item">
                             <div class="balance-label">
-                                <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 24px; height: 24px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                                <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
                                 SOL
                             </div>
                             <div class="balance-amount">${solAmount.toFixed(9)}</div>
@@ -497,61 +497,35 @@
                     `;
                 }
 
-                if (usdcData.success && usdcData.data && usdcData.data.usdc !== undefined) {
-                    const usdcAmount = usdcData.data.usdc || 0;
-                    const usdcPrice = prices?.['usd-coin']?.usd;
-                    const usdValue = usdcPrice ? formatUSDPrice(usdcAmount * usdcPrice) : '';
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <img src="tokens/usdc.svg" alt="USDC" style="width: 24px; height: 24px; margin-right: 8px; display: inline-block; vertical-align: middle;">
-                                USDC
-                            </div>
-                            <div class="balance-amount">$${usdcAmount.toFixed(6)}</div>
-                            ${usdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdValue}</div>` : ''}
-                            <div class="balance-unit">USD Coin</div>
+                const usdcAmount = (usdcData.success && usdcData.data?.usdc !== undefined) ? usdcData.data.usdc : 0;
+                const usdcPrice = prices?.['usd-coin']?.usd;
+                const usdcUsdValue = usdcPrice ? formatUSDPrice(usdcAmount * usdcPrice) : '';
+                html += `
+                    <div class="balance-item">
+                        <div class="balance-label">
+                            <img src="tokens/usdc.svg" alt="USDC" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                            USDC
                         </div>
-                    `;
-                } else {
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <span class="balance-label-dot dot-usdc"></span>
-                                USDC
-                            </div>
-                            <div class="balance-amount">—</div>
-                            <div class="balance-unit">No account</div>
-                        </div>
-                    `;
-                }
+                        <div class="balance-amount">$${usdcAmount.toFixed(6)}</div>
+                        ${usdcUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdcUsdValue}</div>` : ''}
+                        <div class="balance-unit">USD Coin</div>
+                    </div>
+                `;
 
-                if (usdtData.success && usdtData.data && usdtData.data.usdt !== undefined) {
-                    const usdtAmount = usdtData.data.usdt || 0;
-                    const usdtPrice = prices?.tether?.usd;
-                    const usdValue = usdtPrice ? formatUSDPrice(usdtAmount * usdtPrice) : '';
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <img src="tokens/usdt.svg" alt="USDT" style="width: 24px; height: 24px; margin-right: 8px; display: inline-block; vertical-align: middle;">
-                                USDT
-                            </div>
-                            <div class="balance-amount">$${usdtAmount.toFixed(6)}</div>
-                            ${usdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdValue}</div>` : ''}
-                            <div class="balance-unit">Tether</div>
+                const usdtAmount = (usdtData.success && usdtData.data?.usdt !== undefined) ? usdtData.data.usdt : 0;
+                const usdtPrice = prices?.tether?.usd;
+                const usdtUsdValue = usdtPrice ? formatUSDPrice(usdtAmount * usdtPrice) : '';
+                html += `
+                    <div class="balance-item">
+                        <div class="balance-label">
+                            <img src="tokens/usdt.svg" alt="USDT" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                            USDT
                         </div>
-                    `;
-                } else {
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <span class="balance-label-dot dot-usdt"></span>
-                                USDT
-                            </div>
-                            <div class="balance-amount">—</div>
-                            <div class="balance-unit">No account</div>
-                        </div>
-                    `;
-                }
+                        <div class="balance-amount">$${usdtAmount.toFixed(6)}</div>
+                        ${usdtUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdtUsdValue}</div>` : ''}
+                        <div class="balance-unit">Tether</div>
+                    </div>
+                `;
 
                 container.innerHTML = html;
             } catch (error) {
