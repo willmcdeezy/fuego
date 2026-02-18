@@ -155,6 +155,41 @@
             margin-top: 32px;
             margin-bottom: 12px;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .refresh-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: normal;
+        }
+
+        .refresh-btn:hover {
+            background: var(--accent-purple);
+            color: white;
+            border-color: var(--accent-purple);
+        }
+
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+
+        .refresh-btn.refreshing {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .balances-grid {
@@ -397,7 +432,13 @@
         </div>
 
         <!-- Transactions -->
-        <div class="section-title">Recent Activity</div>
+        <div class="section-title">
+            <span>Recent Activity</span>
+            <button class="refresh-btn" onclick="refreshTransactions()" id="refreshBtn">
+                <span>🔄</span>
+                <span>Refresh</span>
+            </button>
+        </div>
         <div class="tx-list" id="txList">
             <div class="no-transactions">No transactions yet</div>
         </div>
@@ -717,6 +758,30 @@
                 if (html) container.innerHTML = html;
             } catch (error) {
                 // Silently fail - endpoint not ready
+            }
+        }
+
+        async function refreshTransactions() {
+            const btn = document.getElementById('refreshBtn');
+            const btnText = btn.querySelector('span:last-child');
+            
+            // Show loading state
+            btn.classList.add('refreshing');
+            const originalText = btnText.textContent;
+            btnText.textContent = 'Refreshing...';
+            
+            try {
+                // Get current wallet address
+                const address = document.getElementById('address').textContent;
+                if (address && address !== 'Loading...') {
+                    await loadTransactions(address);
+                }
+            } catch (error) {
+                console.error('Failed to refresh transactions:', error);
+            } finally {
+                // Restore button state
+                btn.classList.remove('refreshing');
+                btnText.textContent = originalText;
             }
         }
 
