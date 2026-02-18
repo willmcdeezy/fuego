@@ -498,7 +498,6 @@
         <div class="section-title">
             <span>Recent Activity</span>
             <button class="refresh-btn" onclick="refreshTransactions()" id="refreshBtn">
-                <span>🔄</span>
                 <span>Refresh</span>
             </button>
         </div>
@@ -872,7 +871,7 @@
 
         async function refreshTransactions() {
             const btn = document.getElementById('refreshBtn');
-            const btnText = btn.querySelector('span:last-child');
+            const btnText = btn.querySelector('span');
             
             // Show loading state
             btn.classList.add('refreshing');
@@ -930,28 +929,25 @@
                         timestamp = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     }
                     
-                    // Status badge
+                    // Status for inline display
                     const isFinalized = tx.confirmationStatus === 'finalized';
-                    const statusBadge = isFinalized 
-                        ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">✓</span>'
-                        : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">⏳</span>';
+                    const statusText = isFinalized ? 'Finalized' : 'Pending';
                     
                     html += `
                         <div class="tx-item">
-                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                                 <span style="font-size: 20px;">📄</span>
                                 <div class="tx-info">
                                     <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center;">
                                         Transaction
                                     </div>
-                                    <div class="tx-signature" style="margin-top: 2px;">${tx.signature.substring(0, 16)}...</div>
+                                    <div class="tx-signature" style="margin-top: 2px; font-family: 'Monaco', 'Menlo', monospace; font-size: 11px; color: var(--text-secondary);">${tx.signature.substring(0, 16)}...</div>
                                     <div class="tx-time" style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
-                                        ${timestamp}
+                                        ${timestamp} • <span style="color: ${isFinalized ? '#10b981' : '#f59e0b'}; font-weight: 500;">${statusText}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="tx-link" style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                                ${statusBadge}
+                            <div class="tx-link">
                                 <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
                             </div>
                         </div>
