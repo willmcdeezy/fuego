@@ -1,24 +1,20 @@
 import fs from 'fs'
 import path from 'path'
-import { Keypair, PublicKey } from '@solana/web3.js'
+import { Keypair } from '@solana/web3.js'
 import { 
-  encryptData, 
-  decryptData, 
-  deriveKeyFromPassword, 
-  generateSalt 
+  saveWalletToFile, 
+  loadWalletFromFile,
+  isValidWalletFile
 } from './crypto'
 import {
   WalletConfig,
-  KeychainStore,
-  SessionToken,
-  FuegoConfig,
-  EncryptedKeypair
+  FuegoConfig
 } from './types'
 
 export class FuegoWallet {
   private config: FuegoConfig
-  private sessionToken: SessionToken | null = null
   private walletConfig: WalletConfig | null = null
+  private keypair: Keypair | null = null
 
   constructor(config?: Partial<FuegoConfig>) {
     const homeDir = process.env.HOME || process.env.USERPROFILE || ''
@@ -26,10 +22,8 @@ export class FuegoWallet {
 
     this.config = {
       configPath: path.join(fuegoDir, 'config.json'),
-      keychainPath: path.join(fuegoDir, 'keychain', 'id.json'),
-      saltPath: path.join(fuegoDir, 'keychain', 'salt.json'),
+      walletPath: path.join(fuegoDir, 'wallet.json'),  // Simple JSON file
       logsPath: path.join(fuegoDir, 'logs'),
-      sessionTimeout: 30 * 60 * 1000,  // 30 minutes
       ...config
     }
 
@@ -37,83 +31,48 @@ export class FuegoWallet {
   }
 
   /**
-   * Initialize wallet with new keypair
+   * Initialize wallet with new keypair - NO PASSWORD REQUIRED!
    */
-  async initialize(keypair: Keypair, password: string): Promise<void> {
+  async initialize(keypair: Keypair, network = 'mainnet-beta'): Promise<void> {
     console.log('🔥 Initializing Fuego wallet...')
 
     // Create directories
     const fuegoDir = path.dirname(this.config.configPath)
-    const keychainDir = path.dirname(this.config.keychainPath)
     const logsDir = this.config.logsPath
 
-    for (const dir of [fuegoDir, keychainDir, logsDir]) {
+    for (const dir of [fuegoDir, logsDir]) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
       }
     }
 
-    // Generate salt and derive key
-    const salt = generateSalt()
-    const key = await deriveKeyFromPassword(password, salt)
-
-    // Encrypt keypair
-    const keypairBuffer = Buffer.from(keypair.secretKey)
-    const encrypted = encryptData(keypairBuffer, key)
-
-    // Store encrypted keypair
-    const keychain: KeychainStore = {
-      encrypted,
-      salt: salt.toString('base64')
-    }
-    fs.writeFileSync(this.config.keychainPath, JSON.stringify(keychain, null, 2))
+    // Save wallet as simple JSON
+    saveWalletToFile(keypair, this.config.walletPath, network)
 
     // Store wallet config
     this.walletConfig = {
       walletAddress: keypair.publicKey.toString(),
-      network: 'mainnet-beta',
+      network: network as any,
       createdAt: Date.now(),
       version: '0.1.0'
     }
     fs.writeFileSync(this.config.configPath, JSON.stringify(this.walletConfig, null, 2))
-
-    // Set file permissions (user read/write only)
-    fs.chmodSync(this.config.keychainPath, 0o600)
-    fs.chmodSync(this.config.saltPath, 0o600)
     fs.chmodSync(this.config.configPath, 0o600)
 
     console.log(`✅ Wallet initialized: ${keypair.publicKey.toString()}`)
+    console.log(`📁 Wallet file: ${this.config.walletPath}`)
   }
 
   /**
-   * Authenticate with password and create session
+   * Load wallet - NO PASSWORD REQUIRED!
    */
-  async authenticate(password: string): Promise<void> {
-    if (!fs.existsSync(this.config.keychainPath)) {
-      throw new Error('Wallet not initialized. Run "fuego init" first.')
+  async load(): Promise<void> {
+    if (!fs.existsSync(this.config.walletPath)) {
+      throw new Error('Wallet not found. Run "fuego init" first.')
     }
 
-    const keychain: KeychainStore = JSON.parse(
-      fs.readFileSync(this.config.keychainPath, 'utf-8')
-    )
-
-    const salt = Buffer.from(keychain.salt, 'base64')
-    const key = await deriveKeyFromPassword(password, salt)
-
-    // Test decryption
-    try {
-      decryptData(keychain.encrypted, key)
-    } catch (error) {
-      throw new Error('Invalid password')
-    }
-
-    // Store session token
-    this.sessionToken = {
-      key,
-      expiry: Date.now() + this.config.sessionTimeout
-    }
-
-    console.log('✅ Authentication successful')
+    this.keypair = loadWalletFromFile(this.config.walletPath)
+    console.log('✅ Wallet loaded successfully')
   }
 
   /**
@@ -127,30 +86,14 @@ export class FuegoWallet {
   }
 
   /**
-   * Check if session is valid
+   * Get keypair - NO SESSION/PASSWORD CHECKS!
    */
-  private ensureSessionValid(): void {
-    if (!this.sessionToken) {
-      throw new Error('Not authenticated. Call authenticate() first.')
+  getKeypair(): Keypair {
+    if (!this.keypair) {
+      // Auto-load if needed
+      this.keypair = loadWalletFromFile(this.config.walletPath)
     }
-    if (Date.now() > this.sessionToken.expiry) {
-      this.sessionToken = null
-      throw new Error('Session expired. Re-authenticate.')
-    }
-  }
-
-  /**
-   * Get decrypted keypair (requires active session)
-   */
-  private getKeypair(): Keypair {
-    this.ensureSessionValid()
-
-    const keychain: KeychainStore = JSON.parse(
-      fs.readFileSync(this.config.keychainPath, 'utf-8')
-    )
-
-    const decrypted = decryptData(keychain.encrypted, this.sessionToken!.key)
-    return Keypair.fromSecretKey(new Uint8Array(decrypted))
+    return this.keypair
   }
 
   /**
@@ -158,15 +101,18 @@ export class FuegoWallet {
    */
   signData(data: Buffer): Buffer {
     const keypair = this.getKeypair()
-    return Buffer.from(keypair.sign(data))
+    const nacl = require('tweetnacl')
+    
+    // Use nacl to sign with the secret key
+    const signature = nacl.sign.detached(data, keypair.secretKey)
+    return Buffer.from(signature)
   }
 
   /**
-   * Logout (clear session)
+   * Check if wallet exists
    */
-  logout(): void {
-    this.sessionToken = null
-    console.log('✅ Logged out')
+  exists(): boolean {
+    return isValidWalletFile(this.config.walletPath)
   }
 
   /**
@@ -180,3 +126,7 @@ export class FuegoWallet {
     }
   }
 }
+
+// Export utilities for direct use
+export { saveWalletToFile, loadWalletFromFile, isValidWalletFile } from './crypto'
+export * from './types'

@@ -1,4 +1,4 @@
-// Core wallet types
+// Core wallet types - SIMPLIFIED (no encryption)
 export interface WalletConfig {
   walletAddress: string
   network: 'mainnet-beta' | 'devnet' | 'testnet'
@@ -6,26 +6,15 @@ export interface WalletConfig {
   version: string
 }
 
-export interface EncryptedKeypair {
-  nonce: string  // Base64 encoded
-  ciphertext: string  // Base64 encoded
-  algorithm: 'AES-256-GCM'
-}
-
-export interface KeychainStore {
-  encrypted: EncryptedKeypair
-  salt: string  // Base64 encoded Argon2 salt
-}
-
-export interface SessionToken {
-  key: Buffer  // Derived encryption key
-  expiry: number  // Timestamp
+// Simple wallet storage (Solana CLI compatible)
+export interface WalletStore {
+  privateKey: number[]  // Array of 64 bytes (Solana standard format)
+  address: string
+  network: string
 }
 
 export interface FuegoConfig {
   configPath: string
-  keychainPath: string
-  saltPath: string
+  walletPath: string  // Single wallet file (no encryption)
   logsPath: string
-  sessionTimeout: number  // ms
 }

@@ -1,92 +1,59 @@
-#!/usr/bin/env ts-node
-import readline from 'readline'
+#!/usr/bin/env node
+/**
+ * Fuego Init - Simple wallet creation (NO PASSWORDS!)
+ */
+
+import fs from 'fs'
+import path from 'path'
 import { Keypair } from '@solana/web3.js'
 import { FuegoWallet } from '../index'
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-})
-
-function prompt(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => resolve(answer))
-  })
-}
-
-function promptPassword(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      console.clear() // Hide password from terminal
-      resolve(answer)
-    })
-  })
-}
-
 async function main() {
-  console.log('🔥 Fuego Wallet Initializer\n')
+  console.log('🔥 Fuego Wallet Init - Agent-Ready Edition\n')
   
-  try {
-    // Check if already initialized
-    const wallet = new FuegoWallet()
-    const existingAddress = wallet.getAddress()
-    if (existingAddress !== 'unknown') {
-      console.log(`❌ Wallet already initialized: ${existingAddress}`)
-      console.log('To reset, delete ~/.fuego and run again.')
-      process.exit(1)
-    }
-
-    // Get keypair path
-    const keypairPath = await prompt(
-      '📁 Enter path to Solana keypair file (from solana-keygen): '
-    )
-
-    // Load keypair
-    let keypair: Keypair
-    try {
-      const keypairData = require(keypairPath)
-      keypair = Keypair.fromSecretKey(new Uint8Array(keypairData))
-    } catch (error) {
-      console.error('❌ Failed to load keypair:', error)
-      process.exit(1)
-    }
-
-    console.log(`✅ Loaded keypair: ${keypair.publicKey.toString()}\n`)
-
-    // Get password
-    const password = await promptPassword(
-      '🔐 Create encryption password (will not echo): '
-    )
-    
-    const confirmPassword = await promptPassword(
-      '🔐 Confirm password (will not echo): '
-    )
-
-    if (password !== confirmPassword) {
-      console.error('❌ Passwords do not match')
-      process.exit(1)
-    }
-
-    // Initialize
-    const fw = new FuegoWallet()
-    await fw.initialize(keypair, password)
-
-    console.log('\n✨ Setup complete!')
-    console.log(`   Address: ${keypair.publicKey.toString()}`)
-    console.log(`   Config:  ~/.fuego/config.json`)
-    console.log(`   Keys:    ~/.fuego/keychain/id.json (encrypted)`)
-    console.log('\n🚀 Next steps:')
-    console.log('   1. const wallet = new FuegoWallet()')
-    console.log('   2. await wallet.authenticate(password)')
-    console.log('   3. wallet.signData(data)')
-
-    process.exit(0)
-  } catch (error) {
-    console.error('❌ Error:', error)
+  const homeDir = process.env.HOME || process.env.USERPROFILE || ''
+  const fuegoDir = path.join(homeDir, '.fuego')
+  const walletPath = path.join(fuegoDir, 'wallet.json')
+  
+  // Check if wallet already exists
+  if (fs.existsSync(walletPath)) {
+    console.log('❌ Wallet already exists at ~/.fuego/wallet.json')
+    console.log('   If you want to replace it, run: rm -rf ~/.fuego')
     process.exit(1)
-  } finally {
-    rl.close()
   }
+  
+  // Generate keypair
+  console.log('🔑 Generating new Solana keypair...')
+  const keypair = Keypair.generate()
+  const address = keypair.publicKey.toString()
+  console.log(`✅ Address: ${address}\n`)
+  
+  // Initialize wallet
+  const wallet = new FuegoWallet()
+  await wallet.initialize(keypair)
+  
+  // Save backup in standard Solana CLI format
+  const backupDir = path.join(homeDir, '.config', 'solana')
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 })
+  }
+  
+  const backupPath = path.join(backupDir, 'fuego-backup.json')
+  fs.writeFileSync(backupPath, JSON.stringify(Array.from(keypair.secretKey)))
+  fs.chmodSync(backupPath, 0o600)
+  console.log(`💾 Backup saved: ${backupPath}`)
+  
+  console.log('\n✅ Fuego wallet ready for agents!')
+  console.log(`   Address: ${address}`)
+  console.log(`   Wallet:  ~/.fuego/wallet.json`)
+  console.log(`   Backup:  ${backupPath}`)
+  console.log('\n🚀 Next steps:')
+  console.log('   1. Start fuego server: cd server && ./target/release/fuego-server')
+  console.log('   2. Your agents can now sign transactions instantly!')
+  console.log('\n💡 Zero friction! No passwords, no prompts, just works. 🔮')
 }
 
-main()
+main().catch(err => {
+  console.error('Error:', err.message)
+  process.exit(1)
+})
