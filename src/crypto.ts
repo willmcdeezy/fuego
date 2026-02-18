@@ -10,9 +10,17 @@ export async function deriveKeyFromPassword(
   password: string,
   salt: Buffer
 ): Promise<Buffer> {
-  const derived = await argon2.hash(password, salt)
-  // Take first 32 bytes for AES-256
-  return Buffer.from(derived.slice(0, 32))
+  // Use raw: true for deterministic key derivation
+  // This ensures the same password + salt always produces the same key
+  return argon2.hash(password, {
+    salt,
+    raw: true,
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4,
+    hashLength: 32
+  })
 }
 
 /**

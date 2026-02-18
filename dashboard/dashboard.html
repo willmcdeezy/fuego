@@ -497,7 +497,7 @@
                     `;
                 }
 
-                const usdcAmount = (usdcData.success && usdcData.data?.usdc !== undefined) ? usdcData.data.usdc : 0;
+                const usdcAmount = (usdcData.success && usdcData.data?.ui_amount !== undefined) ? parseFloat(usdcData.data.ui_amount) : 0;
                 const usdcPrice = prices?.['usd-coin']?.usd;
                 const usdcUsdValue = usdcPrice ? formatUSDPrice(usdcAmount * usdcPrice) : '';
                 html += `
@@ -512,7 +512,7 @@
                     </div>
                 `;
 
-                const usdtAmount = (usdtData.success && usdtData.data?.usdt !== undefined) ? usdtData.data.usdt : 0;
+                const usdtAmount = (usdtData.success && usdtData.data?.ui_amount !== undefined) ? parseFloat(usdtData.data.ui_amount) : 0;
                 const usdtPrice = prices?.tether?.usd;
                 const usdtUsdValue = usdtPrice ? formatUSDPrice(usdtAmount * usdtPrice) : '';
                 html += `
