@@ -22,6 +22,8 @@ use tower_http::cors::{Any, CorsLayer};
 use utils::string_to_pub_key;
 use base64::engine::general_purpose;
 use base64::Engine;
+use std::fs;
+use std::path::Path;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -91,6 +93,24 @@ struct SubmitTransactionRequest {
     transaction: String, // Base64-encoded signed transaction
     #[serde(default)]
     commitment: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct WalletConfig {
+    #[serde(rename = "walletAddress")]
+    wallet_address: String,
+    network: String,
+    #[serde(rename = "createdAt")]
+    created_at: i64,
+    version: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct WalletStore {
+    #[serde(rename = "privateKey")]
+    private_key: Vec<u8>,
+    address: String,
+    network: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -848,6 +868,51 @@ async fn get_pyusd_balance(
 }
 */
 
+async fn get_wallet_address() -> Response {
+    // Try to load wallet address from ~/.fuego/config.json or ~/.fuego/wallet.json
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
+    
+    // Try config.json first (has walletAddress field)
+    let config_path = home_dir.join(".fuego").join("config.json");
+    if config_path.exists() {
+        if let Ok(config_content) = fs::read_to_string(&config_path) {
+            if let Ok(config) = serde_json::from_str::<WalletConfig>(&config_content) {
+                return Json(json!({
+                    "success": true,
+                    "data": {
+                        "address": config.wallet_address,
+                        "network": config.network,
+                        "source": "config"
+                    }
+                })).into_response();
+            }
+        }
+    }
+    
+    // Fallback to wallet.json (has address field)
+    let wallet_path = home_dir.join(".fuego").join("wallet.json");
+    if wallet_path.exists() {
+        if let Ok(wallet_content) = fs::read_to_string(&wallet_path) {
+            if let Ok(wallet) = serde_json::from_str::<WalletStore>(&wallet_content) {
+                return Json(json!({
+                    "success": true,
+                    "data": {
+                        "address": wallet.address,
+                        "network": wallet.network,
+                        "source": "wallet"
+                    }
+                })).into_response();
+            }
+        }
+    }
+    
+    // No wallet found
+    Json(json!({
+        "success": false,
+        "error": "No wallet found. Initialize with: node src/cli/init.ts"
+    })).into_response()
+}
+
 #[tokio::main]
 async fn main() {
     let state = AppState {
@@ -863,6 +928,7 @@ async fn main() {
         .route("/", get(|| async { "Fuego Server 🔥" }))
         .route("/health", get(health_check))
         .route("/network", get(get_default_network))
+        .route("/wallet-address", get(get_wallet_address))
         // READ endpoints
         .route("/latest-hash", post(get_latest_hash))
         .route("/balance", post(get_balance))
@@ -884,6 +950,7 @@ async fn main() {
     println!("  READ:");
     println!("    GET  /health - Health check");
     println!("    GET  /network - Get default network");
+    println!("    GET  /wallet-address - Get local wallet address");
     println!("    POST /latest-hash - Get latest blockhash");
     println!("    POST /balance - Get SOL balance");
     println!("    POST /usdc-balance - Get USDC balance");

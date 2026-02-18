@@ -434,9 +434,19 @@
         }
 
         async function getWalletAddress() {
-            // Load from embedded config (not URL for privacy)
-            const CONFIG_WALLET = 'FgbVaHht1zSBtFUNGDu6E4BkVBuGXWhpS8JeFpCGEquL';
-            return CONFIG_WALLET;
+            try {
+                const response = await fetch(`${API_URL}/wallet-address`);
+                const data = await response.json();
+                
+                if (data.success && data.data && data.data.address) {
+                    return data.data.address;
+                }
+                
+                throw new Error(data.error || 'Failed to load wallet address');
+            } catch (error) {
+                console.error('Failed to load wallet address:', error);
+                throw new Error('Wallet not initialized. Run: node src/cli/init.ts');
+            }
         }
 
         async function loadBalances(address) {
