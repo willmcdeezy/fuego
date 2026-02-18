@@ -829,7 +829,6 @@
                     const isFinalized = txSig.confirmationStatus === 'finalized';
                     
                     const largeTokenIcon = getTokenIcon(tx.token, '24px');
-                    const smallTokenIcon = getTokenIcon(tx.token, '14px');
                     const direction = isOutgoing ? 'Sent' : 'Received';
                     const statusText = isFinalized ? 'Finalized' : 'Pending';
                     
@@ -846,7 +845,7 @@
                                 ${largeTokenIcon}
                                 <div class="tx-info">
                                     <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                                        ${direction} ${formattedAmount} ${smallTokenIcon} ${tx.token}
+                                        ${direction} ${formattedAmount} <span style="font-weight: 400; color: var(--text-secondary);">${tx.token}</span>
                                     </div>
                                     <div class="tx-signature" style="margin-top: 2px; font-family: 'Monaco', 'Menlo', monospace; font-size: 11px; color: var(--text-secondary);">${txSig.signature.substring(0, 16)}...</div>
                                     <div class="tx-detail" style="font-size: 11px; margin-top: 4px;">
