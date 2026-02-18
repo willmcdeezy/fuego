@@ -611,6 +611,15 @@
             return isOutgoing ? '📤' : '📥';
         }
 
+        function getTokenIcon(token) {
+            switch (token) {
+                case 'SOL': return '◎';
+                case 'USDC': return '💵'; 
+                case 'USDT': return '💰';
+                default: return '🪙';
+            }
+        }
+
         function formatAmount(rawAmount, token) {
             if (!rawAmount || isNaN(rawAmount)) return '0';
             const amount = parseFloat(rawAmount);
