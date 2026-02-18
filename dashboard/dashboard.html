@@ -803,8 +803,8 @@
                     // Status badge
                     const isFinalized = txSig.confirmationStatus === 'finalized';
                     const statusBadge = isFinalized 
-                        ? '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">✓ Finalized</span>'
-                        : '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">Pending</span>';
+                        ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">✓</span>'
+                        : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">⏳</span>';
                     
                     const txIcon = getTxIcon(isOutgoing);
                     const tokenIcon = getTokenIcon(tx.token);
@@ -823,7 +823,7 @@
                                 <span style="font-size: 20px;">${txIcon}</span>
                                 <div class="tx-info">
                                     <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center;">
-                                        ${direction} ${formattedAmount} ${tokenIcon} ${tx.token}${statusBadge}
+                                        ${direction} ${formattedAmount} ${tokenIcon} ${tx.token}
                                     </div>
                                     <div class="tx-signature" style="margin-top: 2px;">${txSig.signature.substring(0, 16)}...</div>
                                     <div class="tx-detail" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
@@ -834,7 +834,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="tx-link">
+                            <div class="tx-link" style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                                ${statusBadge}
                                 <a href="https://explorer.solana.com/tx/${txSig.signature}?cluster=${NETWORK}" target="_blank">View</a>
                             </div>
                         </div>
@@ -910,8 +911,8 @@
                     // Status badge
                     const isFinalized = tx.confirmationStatus === 'finalized';
                     const statusBadge = isFinalized 
-                        ? '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">✓ Finalized</span>'
-                        : '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">Pending</span>';
+                        ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">✓</span>'
+                        : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">⏳</span>';
                     
                     html += `
                         <div class="tx-item">
@@ -919,7 +920,7 @@
                                 <span style="font-size: 20px;">📄</span>
                                 <div class="tx-info">
                                     <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center;">
-                                        Transaction${statusBadge}
+                                        Transaction
                                     </div>
                                     <div class="tx-signature" style="margin-top: 2px;">${tx.signature.substring(0, 16)}...</div>
                                     <div class="tx-time" style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
@@ -927,7 +928,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="tx-link">
+                            <div class="tx-link" style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                                ${statusBadge}
                                 <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
                             </div>
                         </div>
