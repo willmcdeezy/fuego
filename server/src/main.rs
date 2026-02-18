@@ -854,6 +854,65 @@ async fn get_fuego_transactions(
     .into_response()
 }
 
+async fn get_all_transactions(
+    Json(payload): Json<GetAccountSignatures>,
+) -> Response {
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let user_pubkey = match string_to_pub_key(&payload.address) {
+        Ok(pubkey) => pubkey,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid wallet address"
+            }))
+            .into_response()
+        }
+    };
+
+    let config = solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config {
+        before: None,
+        until: None,
+        limit: payload.limit.or(Some(20)), // Default to 20 transactions for "all"
+        commitment: Some(CommitmentConfig::confirmed()),
+    };
+
+    let signatures = match rpc.get_signatures_for_address_with_config(&user_pubkey, config) {
+        Ok(signatures) => signatures,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Could not retrieve signatures for account"
+            }))
+            .into_response()
+        }
+    };
+
+    // Return ALL transactions (no filtering)
+    // Simple format: just signature, blockTime, slot, confirmationStatus, err
+    let all_transactions: Vec<_> = signatures
+        .iter()
+        .map(|rpc_confirmed_tx_with_status_meta| {
+            serde_json::json!({
+                "signature": rpc_confirmed_tx_with_status_meta.signature.to_string(),
+                "blockTime": rpc_confirmed_tx_with_status_meta.block_time,
+                "slot": rpc_confirmed_tx_with_status_meta.slot,
+                "confirmationStatus": format!("{:?}", rpc_confirmed_tx_with_status_meta.confirmation_status.unwrap_or(solana_transaction_status::TransactionConfirmationStatus::Processed)).to_lowercase(),
+                "err": rpc_confirmed_tx_with_status_meta.err
+            })
+        })
+        .collect();
+
+    Json(json!({
+        "success": true,
+        "data": all_transactions,
+        "network": payload.network,
+        "status": "Successful all transactions request"
+    }))
+    .into_response()
+}
+
 // TODO: PYUSD balance endpoint using Token-2022
 // Requires getTokenAccountsByOwner implementation
 // Issue: Standard ATA derivation doesn't work for Token-2022
@@ -940,6 +999,7 @@ async fn main() {
         .route("/build-transfer-usdt", post(build_transfer_usdt))
         .route("/submit-transaction", post(submit_transaction))
         .route("/transaction-history", post(get_fuego_transactions))
+        .route("/all-transactions", post(get_all_transactions))
         // TODO: .route("/pyusd-balance", post(get_pyusd_balance))
         .layer(cors)
         .with_state(state);
@@ -960,6 +1020,9 @@ async fn main() {
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
     println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)");
     println!("    POST /submit-transaction - Broadcast signed transaction");
+    println!("  HISTORY:");
+    println!("    POST /transaction-history - Get Fuego transactions (filtered)");
+    println!("    POST /all-transactions - Get all transactions (unfiltered)");
     println!("  TODO:");
     println!("    POST /pyusd-balance - Get PYUSD (Token-2022) balance");
 

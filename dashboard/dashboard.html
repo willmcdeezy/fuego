@@ -192,6 +192,40 @@
             cursor: not-allowed;
         }
 
+        /* Transaction Segments */
+        .segment-tabs {
+            display: flex;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .segment-tab {
+            flex: 1;
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .segment-tab.active {
+            background: var(--accent-purple);
+            color: white;
+            font-weight: 600;
+        }
+
+        .segment-tab:not(.active):hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
         .balances-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -439,6 +473,17 @@
                 <span>Refresh</span>
             </button>
         </div>
+        
+        <!-- Transaction Segments -->
+        <div class="segment-tabs">
+            <button class="segment-tab active" onclick="switchSegment('fuego')" id="fuegoTab">
+                Fuego Transactions
+            </button>
+            <button class="segment-tab" onclick="switchSegment('all')" id="allTab">
+                All Transactions
+            </button>
+        </div>
+        
         <div class="tx-list" id="txList">
             <div class="no-transactions">No transactions yet</div>
         </div>
@@ -452,6 +497,9 @@
     <script>
         const API_URL = 'http://127.0.0.1:8080';
         const NETWORK = 'mainnet-beta';
+        
+        // Track current transaction segment
+        let currentSegment = 'fuego';
         
         // CoinGecko API for token prices (free tier)
         const COINGECKO_API = 'https://api.coingecko.com/api/v3';
@@ -468,7 +516,12 @@
                 const address = await getWalletAddress();
                 document.getElementById('address').textContent = address;
                 await loadBalances(address);
-                await loadTransactions(address);
+                // Load transactions based on current segment (default: fuego)
+                if (currentSegment === 'fuego') {
+                    await loadTransactions(address);
+                } else {
+                    await loadAllTransactions(address);
+                }
             } catch (error) {
                 showError(error.message);
             }
@@ -780,10 +833,14 @@
             btnText.textContent = 'Refreshing...';
             
             try {
-                // Get current wallet address
+                // Get current wallet address and load correct segment
                 const address = document.getElementById('address').textContent;
                 if (address && address !== 'Loading...') {
-                    await loadTransactions(address);
+                    if (currentSegment === 'fuego') {
+                        await loadTransactions(address);
+                    } else {
+                        await loadAllTransactions(address);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to refresh transactions:', error);
@@ -791,6 +848,91 @@
                 // Restore button state
                 btn.classList.remove('refreshing');
                 btnText.textContent = originalText;
+            }
+        }
+
+        async function loadAllTransactions(address) {
+            const container = document.getElementById('txList');
+            
+            try {
+                const res = await fetch(`${API_URL}/all-transactions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ network: NETWORK, address, limit: 20 })
+                });
+                
+                if (!res.ok) {
+                    console.log('All transactions fetch failed:', res.status);
+                    return;
+                }
+
+                const data = await res.json();
+                console.log('All transactions response:', JSON.stringify(data, null, 2));
+
+                if (!data.success || !data.data || data.data.length === 0) {
+                    container.innerHTML = '<div class="no-transactions">No transactions found</div>';
+                    return;
+                }
+
+                let html = '';
+                data.data.forEach(tx => {
+                    // Format timestamp
+                    let timestamp = '';
+                    if (tx.blockTime) {
+                        const date = new Date(tx.blockTime * 1000);
+                        timestamp = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+                    
+                    // Status badge
+                    const isFinalized = tx.confirmationStatus === 'finalized';
+                    const statusBadge = isFinalized 
+                        ? '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">✓ Finalized</span>'
+                        : '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">Pending</span>';
+                    
+                    html += `
+                        <div class="tx-item">
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <span style="font-size: 20px;">📄</span>
+                                <div class="tx-info">
+                                    <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center;">
+                                        Transaction${statusBadge}
+                                    </div>
+                                    <div class="tx-signature" style="margin-top: 2px;">${tx.signature.substring(0, 16)}...</div>
+                                    <div class="tx-time" style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        ${timestamp}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tx-link">
+                                <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Failed to load all transactions:', error);
+                container.innerHTML = '<div class="no-transactions">Failed to load transactions</div>';
+            }
+        }
+
+        async function switchSegment(segment) {
+            // Update segment state
+            currentSegment = segment;
+            
+            // Update tab styles
+            document.getElementById('fuegoTab').classList.toggle('active', segment === 'fuego');
+            document.getElementById('allTab').classList.toggle('active', segment === 'all');
+            
+            // Load transactions for the selected segment
+            const address = document.getElementById('address').textContent;
+            if (address && address !== 'Loading...') {
+                if (segment === 'fuego') {
+                    await loadTransactions(address);
+                } else {
+                    await loadAllTransactions(address);
+                }
             }
         }
 
