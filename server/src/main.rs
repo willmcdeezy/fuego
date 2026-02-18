@@ -889,24 +889,9 @@ async fn get_all_transactions(
         }
     };
 
-    // Return ALL transactions (no filtering)
-    // Simple format: just signature, blockTime, slot, confirmationStatus, err
-    let all_transactions: Vec<_> = signatures
-        .iter()
-        .map(|rpc_confirmed_tx_with_status_meta| {
-            serde_json::json!({
-                "signature": rpc_confirmed_tx_with_status_meta.signature.to_string(),
-                "blockTime": rpc_confirmed_tx_with_status_meta.block_time,
-                "slot": rpc_confirmed_tx_with_status_meta.slot,
-                "confirmationStatus": format!("{:?}", rpc_confirmed_tx_with_status_meta.confirmation_status.unwrap_or(solana_transaction_status::TransactionConfirmationStatus::Processed)).to_lowercase(),
-                "err": rpc_confirmed_tx_with_status_meta.err
-            })
-        })
-        .collect();
-
     Json(json!({
         "success": true,
-        "data": all_transactions,
+        "data": signatures,
         "network": payload.network,
         "status": "Successful all transactions request"
     }))
@@ -917,15 +902,7 @@ async fn get_all_transactions(
 // Requires getTokenAccountsByOwner implementation
 // Issue: Standard ATA derivation doesn't work for Token-2022
 // Solution: Enumerate all token accounts owned by wallet and find by mint
-/*
-async fn get_pyusd_balance(
-    State(_state): State<AppState>,
-    Json(payload): Json<GetTokenBalanceRequest>,
-) -> Response {
-    // TODO: Implement getTokenAccountsByOwner search
-    // For now, see get_usdc_balance as working reference
-}
-*/
+
 
 async fn get_wallet_address() -> Response {
     // Try to load wallet address from ~/.fuego/config.json or ~/.fuego/wallet.json
@@ -993,14 +970,13 @@ async fn main() {
         .route("/balance", post(get_balance))
         .route("/usdc-balance", post(get_usdc_balance))
         .route("/usdt-balance", post(get_usdt_balance))
+        .route("/transaction-history", post(get_fuego_transactions))
+        .route("/all-transactions", post(get_all_transactions))
         // TRANSFER endpoints
         .route("/build-transfer-usdc", post(build_transfer_usdc))
         .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/build-transfer-usdt", post(build_transfer_usdt))
         .route("/submit-transaction", post(submit_transaction))
-        .route("/transaction-history", post(get_fuego_transactions))
-        .route("/all-transactions", post(get_all_transactions))
-        // TODO: .route("/pyusd-balance", post(get_pyusd_balance))
         .layer(cors)
         .with_state(state);
 
