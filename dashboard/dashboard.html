@@ -713,15 +713,11 @@
             return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
         }
 
-        function getTxIcon(isOutgoing) {
-            return isOutgoing ? '📤' : '📥';
-        }
-
-        function getTokenIcon(token) {
+        function getTokenIcon(token, size = '16px') {
             switch (token) {
-                case 'SOL': return '<img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">';
-                case 'USDC': return '<img src="tokens/usdc.svg" alt="USDC" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">'; 
-                case 'USDT': return '<img src="tokens/usdt.svg" alt="USDT" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">';
+                case 'SOL': return `<img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: ${size}; height: ${size}; display: inline-block; vertical-align: middle;">`;
+                case 'USDC': return `<img src="tokens/usdc.svg" alt="USDC" style="width: ${size}; height: ${size}; display: inline-block; vertical-align: middle;">`; 
+                case 'USDT': return `<img src="tokens/usdt.svg" alt="USDT" style="width: ${size}; height: ${size}; display: inline-block; vertical-align: middle;">`;
                 default: return '🪙';
             }
         }
@@ -829,15 +825,13 @@
                         timestamp = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     }
                     
-                    // Status badge
+                    // Status for inline display
                     const isFinalized = txSig.confirmationStatus === 'finalized';
-                    const statusBadge = isFinalized 
-                        ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">✓</span>'
-                        : '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px;">⏳</span>';
                     
-                    const txIcon = getTxIcon(isOutgoing);
-                    const tokenIcon = getTokenIcon(tx.token);
+                    const largeTokenIcon = getTokenIcon(tx.token, '24px');
+                    const smallTokenIcon = getTokenIcon(tx.token, '14px');
                     const direction = isOutgoing ? 'Sent' : 'Received';
+                    const statusText = isFinalized ? 'Finalized' : 'Pending';
                     
                     // Format amount with proper decimals and currency
                     const humanAmount = formatAmount(tx.amount, tx.token);
@@ -848,23 +842,23 @@
                     
                     html += `
                         <div class="tx-item">
-                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                                <span style="font-size: 20px;">${txIcon}</span>
+                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                                ${largeTokenIcon}
                                 <div class="tx-info">
-                                    <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center;">
-                                        ${direction} ${formattedAmount} ${tokenIcon} ${tx.token}
+                                    <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                        ${direction} ${formattedAmount} ${smallTokenIcon} ${tx.token}
                                     </div>
-                                    <div class="tx-signature" style="margin-top: 2px;">${txSig.signature.substring(0, 16)}...</div>
-                                    <div class="tx-detail" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
-                                        From: ${fromFormatted} • To: ${toFormatted}
+                                    <div class="tx-signature" style="margin-top: 2px; font-family: 'Monaco', 'Menlo', monospace; font-size: 11px; color: var(--text-secondary);">${txSig.signature.substring(0, 16)}...</div>
+                                    <div class="tx-detail" style="font-size: 11px; margin-top: 4px;">
+                                        <strong style="color: var(--text-primary);">From:</strong> <span style="color: var(--text-secondary);">${fromFormatted}</span> • 
+                                        <strong style="color: var(--text-primary);">To:</strong> <span style="color: var(--text-secondary);">${toFormatted}</span>
                                     </div>
                                     <div class="tx-time" style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
-                                        ${timestamp}
+                                        ${timestamp} • <span style="color: ${isFinalized ? '#10b981' : '#f59e0b'}; font-weight: 500;">${statusText}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="tx-link" style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                                ${statusBadge}
+                            <div class="tx-link">
                                 <a href="https://explorer.solana.com/tx/${txSig.signature}?cluster=${NETWORK}" target="_blank">View</a>
                             </div>
                         </div>
