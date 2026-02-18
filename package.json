@@ -6,9 +6,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "jest",
+    "test": "jest", 
     "dev": "ts-node src/index.ts",
-    "init": "ts-node src/cli/init.ts"
+    "init": "node dist/cli/init.js",
+    "init:dev": "ts-node src/cli/init.ts"
   },
   "dependencies": {
     "@solana/web3.js": "^1.91.0",
