@@ -529,17 +529,41 @@
 
         async function getWalletAddress() {
             try {
-                const response = await fetch(`${API_URL}/wallet-address`);
-                const data = await response.json();
+                // First check if server is running
+                console.log('Checking server health...');
+                const healthResponse = await fetch(`${API_URL}/health`, {
+                    signal: AbortSignal.timeout(5000) // 5 second timeout
+                });
                 
-                if (data.success && data.data && data.data.address) {
-                    return data.data.address;
+                if (!healthResponse.ok) {
+                    throw new Error('SERVER_DOWN');
                 }
                 
-                throw new Error(data.error || 'Failed to load wallet address');
+                // Server is running, now check wallet
+                console.log('Server is running, checking wallet...');
+                const walletResponse = await fetch(`${API_URL}/wallet-address`);
+                const walletData = await walletResponse.json();
+                
+                if (walletData.success && walletData.data && walletData.data.address) {
+                    return walletData.data.address;
+                }
+                
+                // Server is running but no wallet found
+                throw new Error('NO_WALLET');
+                
             } catch (error) {
-                console.error('Failed to load wallet address:', error);
-                throw new Error('Wallet not initialized. Run: node src/cli/init.ts');
+                console.error('Dashboard error:', error);
+                
+                if (error.name === 'AbortError' || error.message === 'SERVER_DOWN' || error.message.includes('fetch')) {
+                    // Server is down or unreachable
+                    throw new Error('🔥 Fuego server not running. Start server: ./server/target/release/fuego-server');
+                } else if (error.message === 'NO_WALLET') {
+                    // Server running but no wallet
+                    throw new Error('💸 No wallet found. Initialize wallet: npm run init');
+                } else {
+                    // Other error
+                    throw new Error('❌ Connection error. Check server status.');
+                }
             }
         }
 
