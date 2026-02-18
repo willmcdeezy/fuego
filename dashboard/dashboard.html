@@ -226,6 +226,35 @@
             background: var(--bg-tertiary);
         }
 
+        .segment-tab:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .segment-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .segment-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--bg-tertiary);
+            border-top: 2px solid var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .balances-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -944,21 +973,53 @@
         }
 
         async function switchSegment(segment) {
-            // Update segment state
-            currentSegment = segment;
+            const container = document.getElementById('txList');
+            const fuegoTab = document.getElementById('fuegoTab');
+            const allTab = document.getElementById('allTab');
             
-            // Update tab styles
-            document.getElementById('fuegoTab').classList.toggle('active', segment === 'fuego');
-            document.getElementById('allTab').classList.toggle('active', segment === 'all');
+            // Don't switch if already on this segment or if loading
+            if (currentSegment === segment || fuegoTab.disabled) {
+                return;
+            }
             
-            // Load transactions for the selected segment
-            const address = document.getElementById('address').textContent;
-            if (address && address !== 'Loading...') {
-                if (segment === 'fuego') {
-                    await loadTransactions(address);
-                } else {
-                    await loadAllTransactions(address);
+            try {
+                // Show loading state immediately
+                container.innerHTML = `
+                    <div class="segment-loading">
+                        <div class="segment-spinner"></div>
+                        <span>Loading ${segment === 'fuego' ? 'Fuego' : 'All'} transactions...</span>
+                    </div>
+                `;
+                
+                // Disable both tabs during loading
+                fuegoTab.disabled = true;
+                allTab.disabled = true;
+                
+                // Update segment state and tab styles
+                currentSegment = segment;
+                fuegoTab.classList.toggle('active', segment === 'fuego');
+                allTab.classList.toggle('active', segment === 'all');
+                
+                // Add a small delay for smooth UX (prevents jarring instant switch)
+                await new Promise(resolve => setTimeout(resolve, 400));
+                
+                // Load transactions for the selected segment
+                const address = document.getElementById('address').textContent;
+                if (address && address !== 'Loading...') {
+                    if (segment === 'fuego') {
+                        await loadTransactions(address);
+                    } else {
+                        await loadAllTransactions(address);
+                    }
                 }
+                
+            } catch (error) {
+                console.error('Failed to switch segment:', error);
+                container.innerHTML = '<div class="no-transactions">Failed to load transactions</div>';
+            } finally {
+                // Re-enable tabs
+                fuegoTab.disabled = false;
+                allTab.disabled = false;
             }
         }
 
