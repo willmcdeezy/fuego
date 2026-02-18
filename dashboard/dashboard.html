@@ -613,9 +613,9 @@
 
         function getTokenIcon(token) {
             switch (token) {
-                case 'SOL': return '◎';
-                case 'USDC': return '💵'; 
-                case 'USDT': return '💰';
+                case 'SOL': return '<img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">';
+                case 'USDC': return '<img src="tokens/usdc.svg" alt="USDC" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">'; 
+                case 'USDT': return '<img src="tokens/usdt.svg" alt="USDT" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">';
                 default: return '🪙';
             }
         }
@@ -746,7 +746,7 @@
                                 <span style="font-size: 20px;">${txIcon}</span>
                                 <div class="tx-info">
                                     <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center;">
-                                        ${direction} ${formattedAmount} ${tx.token}${statusBadge}
+                                        ${direction} ${formattedAmount} ${tokenIcon} ${tx.token}${statusBadge}
                                     </div>
                                     <div class="tx-signature" style="margin-top: 2px;">${txSig.signature.substring(0, 16)}...</div>
                                     <div class="tx-detail" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
