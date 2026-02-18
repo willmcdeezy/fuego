@@ -41,7 +41,16 @@ class SimpleWallet:
     """Minimal wallet implementation for this script"""
     
     def __init__(self, keypair_bytes: bytes, password: str):
-        self.keypair = Keypair.from_bytes(keypair_bytes)
+        # Handle both 32-byte private key and 64-byte secret key
+        if len(keypair_bytes) == 32:
+            # Convert 32-byte private key to base58 and use from_base58_string
+            import base58
+            b58_key = base58.b58encode(keypair_bytes).decode()
+            self.keypair = Keypair.from_base58_string(b58_key)
+        elif len(keypair_bytes) == 64:
+            self.keypair = Keypair.from_bytes(keypair_bytes)
+        else:
+            raise ValueError(f"Invalid keypair length: {len(keypair_bytes)} bytes (expected 32 or 64)")
         self.password = password  # Not actually used here, just for symmetry
     
     @staticmethod
@@ -81,7 +90,17 @@ def load_wallet_from_env() -> Keypair:
     
     from base58 import b58decode
     keypair_bytes = b58decode(keypair_b58)
-    return Keypair.from_bytes(keypair_bytes)
+    
+    # solders expects 64-byte secret key (32 private + 32 public)
+    # If we only have 32 bytes, we need to use from_base58_string instead
+    if len(keypair_bytes) == 32:
+        # This is just the private key part, use from_base58_string
+        return Keypair.from_base58_string(keypair_b58)
+    elif len(keypair_bytes) == 64:
+        # This is the full secret key
+        return Keypair.from_bytes(keypair_bytes)
+    else:
+        raise ValueError(f"Invalid keypair length: {len(keypair_bytes)} bytes (expected 32 or 64)")
 
 
 def build_transfer(server_url: str, network: str, from_addr: str, to_addr: str, 
@@ -181,7 +200,14 @@ def main():
             # Test mode: use provided keypair
             from base58 import b58decode
             keypair_bytes = b58decode(args.keypair)
-            keypair = Keypair.from_bytes(keypair_bytes)
+            
+            # Handle both 32-byte private key and 64-byte secret key
+            if len(keypair_bytes) == 32:
+                keypair = Keypair.from_base58_string(args.keypair)
+            elif len(keypair_bytes) == 64:
+                keypair = Keypair.from_bytes(keypair_bytes)
+            else:
+                raise ValueError(f"Invalid keypair length: {len(keypair_bytes)} bytes (expected 32 or 64)")
             print("✅ Loaded keypair from --keypair")
         else:
             # Production mode: prompt for wallet password
