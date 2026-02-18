@@ -598,15 +598,20 @@
 
             if (!memo) return parsed;
 
-            // Remove [size] prefix if present (e.g., "[130] fuego|...")
+            // Handle memo that starts with [size] prefix
             let cleanMemo = memo;
-            const bracketMatch = memo.match(/^\[\d+\]\s*/);
-            if (bracketMatch) {
-                cleanMemo = memo.substring(bracketMatch[0].length);
+            if (memo.includes('fuego|')) {
+                // Find the 'fuego|' part and start from there
+                const fuegoIndex = memo.indexOf('fuego|');
+                if (fuegoIndex > 0) {
+                    cleanMemo = memo.substring(fuegoIndex);
+                }
             }
 
             const parts = cleanMemo.split('|');
-            if (parts.length < 3) return parsed;
+            
+            // Ensure first part is "fuego" for our transactions
+            if (parts.length < 3 || parts[0] !== 'fuego') return parsed;
 
             parsed.token = parts[1] || 'unknown';
 
