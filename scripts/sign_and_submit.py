@@ -41,7 +41,7 @@ class SimpleWallet:
     """Minimal wallet implementation for this script"""
     
     def __init__(self, keypair_bytes: bytes, password: str):
-        self.keypair = Keypair.from_secret_key(keypair_bytes)
+        self.keypair = Keypair.from_bytes(keypair_bytes)
         self.password = password  # Not actually used here, just for symmetry
     
     @staticmethod
@@ -81,7 +81,7 @@ def load_wallet_from_env() -> Keypair:
     
     from base58 import b58decode
     keypair_bytes = b58decode(keypair_b58)
-    return Keypair.from_secret_key(keypair_bytes)
+    return Keypair.from_bytes(keypair_bytes)
 
 
 def build_transfer(server_url: str, network: str, from_addr: str, to_addr: str, 
@@ -181,7 +181,7 @@ def main():
             # Test mode: use provided keypair
             from base58 import b58decode
             keypair_bytes = b58decode(args.keypair)
-            keypair = Keypair.from_secret_key(keypair_bytes)
+            keypair = Keypair.from_bytes(keypair_bytes)
             print("✅ Loaded keypair from --keypair")
         else:
             # Production mode: prompt for wallet password
