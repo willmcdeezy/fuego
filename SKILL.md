@@ -34,6 +34,28 @@ Traditional Solana wallets break agent workflows:
 
 ---
 
+## 🚨 **CRITICAL FOR AGENTS: Use The Python Script!** 🚨
+
+**If you're an autonomous agent, DO NOT reinvent transaction flows. Use this:**
+
+```bash
+python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.25 --token USDC
+```
+
+**This single command:**
+- ✅ Builds transaction with fresh blockhash
+- ✅ Signs locally (zero network key exposure)  
+- ✅ Submits to chain with proper error handling
+- ✅ Returns signature + explorer link
+- ✅ Tracks with auto-generated agent ID
+- ✅ Works with SOL, USDC, USDT via `--token` flag
+
+**🔥 This is THE agent-first approach. Everything else is secondary.** 
+
+---
+
+---
+
 ## 🚀 Quick Start (5 Minutes)
 
 ### 1. Install & Build
@@ -89,22 +111,43 @@ start dashboard/dashboard.html   # Windows
 - 🌓 **Dark/Light themes** - Automatic system detection
 - 🔗 **Explorer links** - Direct to Solana Explorer
 
-### 5. Send Instant Transactions
+### 5. Send Instant Transactions - THE AGENT WAY 🤖
+
+**⚡ This is THE recommended approach for all autonomous agents:**
+
 ```bash
-# Agent-ready transaction (no password prompts!)
+# Perfect agent workflow - zero interaction, instant execution!
 python3 scripts/sign_and_submit.py \
   --from YOUR_ADDRESS \
   --to GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5 \
-  --amount 0.001 \
-  --token SOL
+  --amount 0.25 \
+  --token USDC
 
 # Output:
+# 🔥 Fuego Agent Transaction Signer - Agent-Ready Edition
 # 📂 Loading wallet from ~/.fuego/wallet.json...
 # ✅ Wallet loaded successfully  
+# 📝 Building unsigned transaction...
+# ✅ Transaction built
 # 🔐 Signing transaction (no password required)...
 # ✅ Transaction signed instantly
+# 📤 Submitting signed transaction...
+# ✅ Transaction submitted!
+# 
+# Signature: 4iygcnVHCJevxpHBFP36eLBQ4pQRzH5qJB5NGhfjTnndBPau6p...
+# Explorer: https://explorer.solana.com/tx/4iygcn...
+# 
 # 🎉 Transaction on-chain! Agent-ready speed achieved! 🔮
 ```
+
+**Why this script is PERFECT for agents:**
+- ✅ **Zero human interaction** - No prompts, no waiting
+- ✅ **Professional CLI interface** - Proper arguments and validation  
+- ✅ **Multi-token support** - SOL, USDC, USDT with `--token` flag
+- ✅ **Auto-generated agent IDs** - Built-in transaction tracking
+- ✅ **Complete status reporting** - Build → Sign → Submit workflow
+- ✅ **Explorer link generation** - Instant verification
+- ✅ **Error handling** - Clear failure messages for debugging
 
 ---
 
@@ -323,10 +366,15 @@ Returns all wallet transactions (signature + timestamp only).
 
 ## 🤖 Agent Integration Patterns
 
-### Python Integration (Recommended)
+---
+
+### 🏆 **THE AGENT-FIRST APPROACH: Python Script Integration**
+
+**This is THE way autonomous agents should use Fuego. No other method comes close.**
+
 ```python
-import requests
 import subprocess
+import requests
 
 class FuegoAgent:
     def __init__(self, server_url="http://127.0.0.1:8080"):
@@ -340,43 +388,88 @@ class FuegoAgent:
         self.wallet_address = data['data']['address']
         return self.wallet_address
     
-    def check_sol_balance(self):
-        """Check SOL balance"""
+    def check_balances(self):
+        """Check all token balances"""
         if not self.wallet_address:
             self.get_wallet_address()
             
-        response = requests.post(f"{self.server_url}/balance", 
+        sol_resp = requests.post(f"{self.server_url}/balance", 
             json={"network": "mainnet-beta", "address": self.wallet_address})
-        return response.json()['data']['sol']
+        usdc_resp = requests.post(f"{self.server_url}/usdc-balance", 
+            json={"network": "mainnet-beta", "address": self.wallet_address})
+        usdt_resp = requests.post(f"{self.server_url}/usdt-balance", 
+            json={"network": "mainnet-beta", "address": self.wallet_address})
+            
+        return {
+            "SOL": sol_resp.json()['data']['sol'],
+            "USDC": usdc_resp.json()['data'].get('ui_amount', 0),
+            "USDT": usdt_resp.json()['data'].get('ui_amount', 0)
+        }
     
-    def send_sol(self, to_address, amount):
-        """Send SOL using the sign_and_submit script"""
+    def send_payment(self, to_address, amount, token="USDC"):
+        """Send payment using THE professional agent script"""
+        if not self.wallet_address:
+            self.get_wallet_address()
+            
         result = subprocess.run([
             'python3', 'scripts/sign_and_submit.py',
             '--from', self.wallet_address,
             '--to', to_address,
             '--amount', str(amount),
-            '--token', 'SOL'
-        ], capture_output=True, text=True)
+            '--token', token
+        ], capture_output=True, text=True, cwd='/path/to/fuego')
         
-        if 'Transaction on-chain' in result.stdout:
+        if 'Transaction on-chain! Agent-ready speed achieved!' in result.stdout:
             # Extract signature from output
-            lines = result.stdout.split('\\n')
-            for line in lines:
+            for line in result.stdout.split('\\n'):
                 if line.startswith('Signature:'):
-                    return line.split(': ')[1].strip()
+                    signature = line.split(': ')[1].strip()
+                    return {
+                        'success': True,
+                        'signature': signature,
+                        'explorer': f'https://explorer.solana.com/tx/{signature}?cluster=mainnet-beta'
+                    }
         else:
-            raise Exception(f"Transaction failed: {result.stderr}")
+            return {
+                'success': False, 
+                'error': result.stderr or result.stdout
+            }
 
-# Usage
+# Perfect agent usage example
 agent = FuegoAgent()
-print(f"Wallet: {agent.get_wallet_address()}")
-print(f"Balance: {agent.check_sol_balance()} SOL")
 
-# Send transaction
-signature = agent.send_sol("GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5", 0.001)
-print(f"Sent! Signature: {signature}")
+# Get wallet and balances
+print(f"🔥 Agent wallet: {agent.get_wallet_address()}")
+balances = agent.check_balances()
+print(f"💰 Balances: {balances}")
+
+# Send instant payment (zero friction!)
+result = agent.send_payment("GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5", 0.25, "USDC")
+if result['success']:
+    print(f"✅ Payment sent! {result['signature']}")
+    print(f"🔍 Explorer: {result['explorer']}")
+else:
+    print(f"❌ Failed: {result['error']}")
 ```
+
+**🚀 Why this approach dominates all alternatives:**
+
+| Feature | Fuego Python Script | Raw API Calls | Other Wallets |
+|---------|-------------------|---------------|---------------|
+| **Zero Interaction** | ✅ Perfect | ❌ Complex signing | ❌ Password prompts |
+| **Professional CLI** | ✅ `--from --to --amount --token` | ❌ Manual JSON | ❌ N/A |
+| **Auto Agent IDs** | ✅ Built-in tracking | ❌ Manual | ❌ No tracking |
+| **Status Reporting** | ✅ Build→Sign→Submit | ❌ Silent failures | ❌ Black box |
+| **Multi-token** | ✅ SOL/USDC/USDT | ❌ Separate endpoints | ❌ Limited |
+| **Error Handling** | ✅ Clear messages | ❌ Raw HTTP errors | ❌ Cryptic failures |
+| **Explorer Links** | ✅ Auto-generated | ❌ Manual construction | ❌ None |
+| **Agent Ready** | ✅ **PERFECT** | ❌ Developer-focused | ❌ Human-focused |
+
+---
+
+### 🛠️ Alternative: Raw API Integration (Not Recommended)
+
+*If you absolutely must use raw API calls instead of the superior Python script:*
 
 ---
 
