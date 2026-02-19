@@ -1,7 +1,7 @@
 ---
 name: fuego
 description: Agent-ready Solana wallet system. Zero passwords, instant signing, local server. Built for autonomous agents that need frictionless Solana transactions.
-homepage: https://github.com/willmcdeezy/fuego
+homepage: https://fuego.cash
 metadata:
   {
     "openclaw":
