@@ -509,16 +509,36 @@ fuego/
 ├── README.md           # Main documentation
 ├── SKILL.md           # This file (agent integration guide)
 ├── ROADMAP.md         # Future plans
+├── COLORS.md          # Brand colors & design system
+├── SETUP_UX.md        # Setup UX documentation
+├── package.json       # Node.js dependencies
+├── tsconfig.json      # TypeScript configuration
+├── src/               # TypeScript source code
+│   ├── index.ts       # Main wallet library
+│   ├── types.ts       # Type definitions
+│   ├── crypto.ts      # Wallet utilities
+│   ├── cli/
+│   │   └── init.ts    # Wallet initialization script
+│   └── __tests__/
+│       └── wallet.test.ts  # Test files
+├── dist/              # Compiled JavaScript (generated)
+│   ├── cli/           # Compiled CLI scripts
+│   └── __tests__/     # Compiled tests
 ├── scripts/           # Agent-ready transaction scripts
 │   └── sign_and_submit.py  # Python transaction tool
 ├── server/            # Rust HTTP server
 │   ├── Cargo.toml     # Rust dependencies
 │   └── src/
-│       └── main.rs    # Server implementation
+│       ├── main.rs    # Server implementation
+│       └── utils/     # Server utilities
 └── dashboard/         # Zero-dependency dashboard
     ├── dashboard.html # Main dashboard (open in browser)
+    ├── README.md      # Dashboard documentation
     ├── tokens/        # Token SVG icons
-    └── README.md      # Dashboard documentation
+    │   ├── solanaLogoMark.svg
+    │   ├── usdc.svg
+    │   └── usdt.svg
+    └── fuego-logo.jpg # Dashboard logo
 ```
 
 ### Prerequisites
