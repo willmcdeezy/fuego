@@ -8,7 +8,7 @@ metadata:
       {
         "emoji": "🔥",
         "requires": { "bins": ["curl"], "env": [] },
-        "optional": { "bins": ["python3"] },
+        "optional": { "bins": ["python3", "node", "npm"] },
       },
   }
 ---
@@ -42,6 +42,10 @@ Traditional Solana wallets break agent workflows:
 git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 
+# Install dependencies and build
+npm install
+npm run build
+
 # Build server
 cd server && cargo build --release
 ```
@@ -49,8 +53,7 @@ cd server && cargo build --release
 ### 2. Initialize Wallet (Password-Free!)
 ```bash
 # Create agent-ready wallet (no password required!)
-# Use the wallet initialization script (Python-based)
-python3 scripts/init_wallet.py
+npm run init
 
 # Output:
 # ✅ Address: DmFyLRiJtc4Bz75hjAqPaEJpDfRe4GEnRLPwc3EgeUZF
@@ -520,6 +523,7 @@ fuego/
 
 ### Prerequisites
 - [Rust](https://rustup.rs/) (1.85+) - **Required for macOS compatibility**
+- [Node.js](https://nodejs.org/) (18+) - For wallet initialization  
 - [Python](https://python.org/) (3.8+) - For transaction scripts
 
 ### Building from Source
@@ -528,10 +532,20 @@ fuego/
 git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 
-# 2. Build Rust server
+# 2. Install Node.js dependencies  
+npm install
+
+# 3. Build TypeScript
+npm run build
+
+# 4. Build Rust server
 cd server
 cargo build --release
 # Binary: target/release/fuego-server
+
+# 5. Run tests
+cd ..
+npm test
 ```
 
 ### Customizing for Your Agents
@@ -570,10 +584,12 @@ sudo useradd -m -s /bin/bash fuego-agent
 # 2. Install Fuego
 sudo -u fuego-agent git clone https://github.com/willmcdeezy/fuego.git /home/fuego-agent/fuego
 cd /home/fuego-agent/fuego
+sudo -u fuego-agent npm install
+sudo -u fuego-agent npm run build
 cd server && sudo -u fuego-agent cargo build --release
 
 # 3. Initialize wallet
-sudo -u fuego-agent python3 scripts/init_wallet.py
+sudo -u fuego-agent npm run init
 
 # 4. Create systemd service
 sudo tee /etc/systemd/system/fuego.service << EOF
@@ -621,7 +637,7 @@ curl http://127.0.0.1:8080/wallet-address
 **Problem: "Wallet not initialized" error**
 ```bash
 # Solution: Initialize wallet
-python3 scripts/init_wallet.py
+npm run init
 ```
 
 **Problem: "Server not running" error**  
