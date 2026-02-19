@@ -13,6 +13,8 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::message::Message;
 use solana_sdk::transaction::Transaction;
+use solana_sdk::hash::Hash;
+use solana_sdk::signer::Signer;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::instruction as token_instruction;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
@@ -24,6 +26,7 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use std::fs;
 use std::path::Path;
+use reqwest;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -119,6 +122,50 @@ struct GetAccountSignatures {
     network: String,
     #[serde(default)]
     limit: Option<usize>,
+}
+
+// x402 Request/Response structs
+#[derive(Serialize, Deserialize)]
+struct X402Request {
+    url: String,
+    #[serde(default = "default_method")]
+    method: String,
+    #[serde(default)]
+    headers: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    body: Option<serde_json::Value>,
+}
+
+fn default_method() -> String {
+    "GET".to_string()
+}
+
+#[derive(Serialize, Deserialize)]
+struct X402PaymentRequirement {
+    asset: String,
+    #[serde(rename = "payTo")]
+    pay_to: String,
+    #[serde(rename = "maxAmountRequired")]
+    max_amount_required: String,
+    network: String,
+    scheme: String,
+    extra: X402Extra,
+}
+
+#[derive(Serialize, Deserialize)]
+struct X402Extra {
+    #[serde(rename = "feePayer")]
+    fee_payer: String,
+    decimals: u8,
+    #[serde(rename = "recentBlockhash")]
+    recent_blockhash: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct X402Response {
+    #[serde(rename = "x402Version")]
+    x402_version: u8,
+    accepts: Vec<X402PaymentRequirement>,
 }
 
 #[allow(dead_code)]
@@ -904,6 +951,318 @@ async fn get_all_transactions(
 // Solution: Enumerate all token accounts owned by wallet and find by mint
 
 
+async fn x402_request(
+    State(_state): State<AppState>,
+    Json(payload): Json<X402Request>,
+) -> Response {
+    let client = reqwest::Client::new();
+    
+    // Step 1: Make initial request
+    let mut request_builder = match payload.method.to_uppercase().as_str() {
+        "GET" => client.get(&payload.url),
+        "POST" => client.post(&payload.url),
+        "PUT" => client.put(&payload.url),
+        "DELETE" => client.delete(&payload.url),
+        "PATCH" => client.patch(&payload.url),
+        _ => {
+            return Json(json!({
+                "success": false,
+                "error": "Unsupported HTTP method"
+            })).into_response();
+        }
+    };
+
+    // Add custom headers
+    for (key, value) in &payload.headers {
+        request_builder = request_builder.header(key, value);
+    }
+
+    // Add body if provided
+    if let Some(body) = &payload.body {
+        request_builder = request_builder.json(body);
+    }
+
+    // Make initial request
+    let initial_response = match request_builder.send().await {
+        Ok(resp) => resp,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to make initial request: {}", e)
+            })).into_response();
+        }
+    };
+
+    // Check if it's a 402 Payment Required response
+    if initial_response.status() != reqwest::StatusCode::PAYMENT_REQUIRED {
+        // Not a payment-required response, return as-is
+        let status = initial_response.status().as_u16();
+        let response_text = match initial_response.text().await {
+            Ok(text) => text,
+            Err(e) => {
+                return Json(json!({
+                    "success": false,
+                    "error": format!("Failed to read response: {}", e)
+                })).into_response();
+            }
+        };
+
+        return Json(json!({
+            "success": true,
+            "status": status,
+            "response": response_text,
+            "payment_required": false
+        })).into_response();
+    }
+
+    // Step 2: Parse x402 payment requirements
+    let x402_response_text = match initial_response.text().await {
+        Ok(text) => text,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to read 402 response: {}", e)
+            })).into_response();
+        }
+    };
+
+    let x402_response: X402Response = match serde_json::from_str(&x402_response_text) {
+        Ok(response) => response,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to parse x402 response: {}", e),
+                "response_text": x402_response_text
+            })).into_response();
+        }
+    };
+
+    // Step 3: Find Solana payment requirement
+    let solana_req = x402_response.accepts.iter()
+        .find(|req| req.network == "solana" || req.network == "solana-mainnet-beta")
+        .or_else(|| x402_response.accepts.first());
+
+    let solana_req = match solana_req {
+        Some(req) => req,
+        None => {
+            return Json(json!({
+                "success": false,
+                "error": "No Solana payment requirement found"
+            })).into_response();
+        }
+    };
+
+    // Step 4: Load local wallet to sign transaction
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
+    let wallet_path = home_dir.join(".fuego").join("wallet.json");
+    
+    let wallet_content = match fs::read_to_string(&wallet_path) {
+        Ok(content) => content,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "No wallet found. Initialize with: node src/cli/init.ts"
+            })).into_response();
+        }
+    };
+
+    let wallet_store: WalletStore = match serde_json::from_str(&wallet_content) {
+        Ok(wallet) => wallet,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid wallet format"
+            })).into_response();
+        }
+    };
+
+    // Step 5: Build transaction using their requirements
+    let from_pubkey = match string_to_pub_key(&wallet_store.address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid wallet address"
+            })).into_response();
+        }
+    };
+
+    let to_pubkey = match string_to_pub_key(&solana_req.pay_to) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid recipient address"
+            })).into_response();
+        }
+    };
+
+    let fee_payer = match string_to_pub_key(&solana_req.extra.fee_payer) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid fee payer address"
+            })).into_response();
+        }
+    };
+
+    let usdc_mint = match string_to_pub_key(USDC_MINT) {
+        Ok(mint) => mint,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid USDC mint"
+            })).into_response();
+        }
+    };
+
+    let blockhash = match solana_sdk::hash::Hash::from_str(&solana_req.extra.recent_blockhash) {
+        Ok(hash) => hash,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid blockhash format"
+            })).into_response();
+        }
+    };
+
+    // Parse payment amount
+    let amount: u64 = match solana_req.max_amount_required.parse() {
+        Ok(amt) => amt,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid payment amount"
+            })).into_response();
+        }
+    };
+
+    // Build transferChecked instruction (as required by x402 standard)
+    let source_ata = get_associated_token_address(&from_pubkey, &usdc_mint);
+    let dest_ata = get_associated_token_address(&to_pubkey, &usdc_mint);
+
+    let transfer_instruction = token_instruction::transfer_checked(
+        &spl_token::ID,
+        &source_ata,
+        &usdc_mint,
+        &dest_ata,
+        &from_pubkey,
+        &[&from_pubkey],
+        amount,
+        solana_req.extra.decimals,
+    ).unwrap();
+
+    // Compute budget instructions (required by facilitators)
+    let compute_limit = ComputeBudgetInstruction::set_compute_unit_limit(300_000);
+    let unit_price = ComputeBudgetInstruction::set_compute_unit_price(5_000);
+
+    // Build transaction with their fee payer and blockhash
+    let message = Message::new_with_blockhash(
+        &[compute_limit, unit_price, transfer_instruction],
+        Some(&fee_payer), // Use their fee payer
+        &blockhash,       // Use their blockhash
+    );
+
+    let mut transaction = Transaction::new_unsigned(message);
+
+    // Step 6: Sign with local wallet (partial signature)
+    let keypair = solana_sdk::signer::keypair::Keypair::from_bytes(&wallet_store.private_key).unwrap();
+    match transaction.try_partial_sign(&[&keypair], blockhash) {
+        Ok(_) => {},
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to sign transaction: {}", e)
+            })).into_response();
+        }
+    }
+
+    // Step 7: Create x402 payment payload
+    let serialized_tx = match transaction.serialize(&[]) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to serialize transaction: {}", e)
+            })).into_response();
+        }
+    };
+
+    let payment_payload = json!({
+        "x402Version": 1,
+        "scheme": "exact",
+        "network": "solana-mainnet-beta",
+        "payload": {
+            "transaction": general_purpose::STANDARD.encode(&serialized_tx)
+        }
+    });
+
+    let x_payment_header = general_purpose::STANDARD.encode(payment_payload.to_string());
+
+    // Step 8: Retry request with X-Payment header
+    let mut retry_builder = match payload.method.to_uppercase().as_str() {
+        "GET" => client.get(&payload.url),
+        "POST" => client.post(&payload.url),
+        "PUT" => client.put(&payload.url),
+        "DELETE" => client.delete(&payload.url),
+        "PATCH" => client.patch(&payload.url),
+        _ => {
+            return Json(json!({
+                "success": false,
+                "error": "Unsupported HTTP method"
+            })).into_response();
+        }
+    };
+
+    // Add original headers plus X-Payment
+    for (key, value) in &payload.headers {
+        retry_builder = retry_builder.header(key, value);
+    }
+    retry_builder = retry_builder.header("X-Payment", x_payment_header);
+
+    // Add body if provided
+    if let Some(body) = &payload.body {
+        retry_builder = retry_builder.json(body);
+    }
+
+    // Make retry request
+    let final_response = match retry_builder.send().await {
+        Ok(resp) => resp,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to make retry request: {}", e)
+            })).into_response();
+        }
+    };
+
+    let final_status = final_response.status().as_u16();
+    let final_text = match final_response.text().await {
+        Ok(text) => text,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to read final response: {}", e)
+            })).into_response();
+        }
+    };
+
+    // Return final response
+    Json(json!({
+        "success": true,
+        "status": final_status,
+        "response": final_text,
+        "payment_required": true,
+        "payment_details": {
+            "amount": amount,
+            "amount_usdc": amount as f64 / 1_000_000.0,
+            "recipient": solana_req.pay_to,
+            "fee_payer": solana_req.extra.fee_payer
+        }
+    })).into_response()
+}
+
 async fn get_wallet_address() -> Response {
     // Try to load wallet address from ~/.fuego/config.json or ~/.fuego/wallet.json
     let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
@@ -977,6 +1336,8 @@ async fn main() {
         .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/build-transfer-usdt", post(build_transfer_usdt))
         .route("/submit-transaction", post(submit_transaction))
+        // x402 endpoints
+        .route("/x402-request", post(x402_request))
         .layer(cors)
         .with_state(state);
 
@@ -999,6 +1360,8 @@ async fn main() {
     println!("  HISTORY:");
     println!("    POST /transaction-history - Get Fuego transactions (filtered)");
     println!("    POST /all-transactions - Get all transactions (unfiltered)");
+  X402:");
+    println!("    POST /x402-request - Generic x402 payment handler (any service)");
     println!("  TODO:");
     println!("    POST /pyusd-balance - Get PYUSD (Token-2022) balance");
 
