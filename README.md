@@ -9,8 +9,8 @@
 ██║     ╚██████╔╝███████╗╚██████╔╝╚██████╔╝
 ╚═╝      ╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ 
   </pre>
-  <h3>🔥 The Agent-Ready Solana Wallet 🔥</h3>
-  <p>Zero friction. Zero passwords. Maximum agent autonomy.</p>
+  <h3>🔥 The OpenClaw Solana Wallet 🔥</h3>
+  <p>Zero friction. Maximum agent autonomy.</p>
 </div>
 
 **The first Solana wallet designed FOR autonomous agents. No passwords, no prompts, no friction. Just instant transaction signing and submission.**
@@ -74,7 +74,7 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 - 🔐 Private keys exposed to third parties
 
 ### ✅ Fuego (Agent Paradise) 
-- 🚀 **Zero friction**: No passwords, no prompts
+- 🚀 **Zero friction**: No passwords, no prompts, unless you want your agent to build that in
 - ⚡ **Instant signing**: Millisecond transaction processing  
 - 🏠 **Local-first**: Keys never leave your machine
 - 📡 **REST API**: Standard HTTP endpoints agents understand
@@ -126,7 +126,7 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 ## 🎯 Features
 
 ### 🔥 Agent-First Design
-- **Zero passwords** - No human intervention required
+- **Zero friction** - No human intervention required
 - **Instant signing** - Transactions sign in milliseconds  
 - **Simple JSON storage** - Standard Solana CLI format
 - **REST API** - HTTP endpoints agents understand
@@ -185,7 +185,7 @@ cd server && cargo build --release
 ```
 
 ### Tech Stack
-- **Server**: Rust + Axum + Solana Web3 SDK
+- **Server**: Rust + Axum + Solana SDK
 - **Client**: TypeScript + @solana/web3.js
 - **Dashboard**: Vanilla HTML/CSS/JS (zero dependencies)
 - **Scripts**: Python + solders + requests
@@ -273,7 +273,6 @@ Currently, Fuego is battle-tested on mainnet with real transactions, but formal 
 
 - ✅ **Unit tests** - Wallet initialization, transaction signing
 - ✅ **Integration tests** - Server endpoints, balance queries
-- ✅ **Dashboard tests** - UI responsiveness, theme switching
 - ✅ **Security tests** - Key handling, error cases
 - ✅ **E2E tests** - Full transaction workflows
 
@@ -289,14 +288,11 @@ Currently, Fuego is battle-tested on mainnet with real transactions, but formal 
 - Professional dashboard with transaction history
 - REST API with complete documentation  
 - Agent-ready transaction scripts
-- MoonPay integration for easy deposits
 
 ### ⏳ v0.2.0 - Advanced Features (Planned)
 - CLI tool (`fuego balance`, `fuego send`, etc.)
 - Transaction history API endpoint
-- Batch transaction support
-- Hardware wallet integration (Ledger, Trezor)
-- Node.js server option (faster development)
+- Node.js server option (faster development - won't need rust but may we will see. May continue building in Rust for security and performance)
 
 ---
 
@@ -307,7 +303,7 @@ Fuego is **production-ready** for agent deployments:
 - ✅ **Battle-tested** - Handles real mainnet transactions
 - ✅ **Error handling** - Graceful failure modes  
 - ✅ **Documentation** - Complete API reference
-- ✅ **Security audited** - No private key exposure
+- ✅ **Security audited** - No private key exposure, everything is local
 - ✅ **Performance** - Millisecond transaction signing
 - ✅ **Reliability** - Works 24/7 without intervention
 
@@ -334,7 +330,8 @@ MIT License - see [LICENSE](LICENSE) for details
 - **📖 Documentation**: [SKILL.md](./SKILL.md)
 - **🐛 Issues**: [GitHub Issues](https://github.com/willmcdeezy/fuego/issues)  
 - **💬 Community**: OpenClaw Discord
-- **🐦 Updates**: [@yatori_io](https://twitter.com/yatori_io)
+- **🐦 Updates**: [@0x_ca55](https://twitter.com/0x_ca55)
+
 
 ---
 
