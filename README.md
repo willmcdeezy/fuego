@@ -10,7 +10,7 @@
 ╚═╝      ╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ 
   </pre>
   <h3>🔥🦞 Agentic Solana Wallet 🦞🔥</h3>
-  <p>Zero friction. Maximum agent autonomy. Your clawbot need fuego to start cookin'!</p>
+  <p>Zero friction. Maximum agent autonomy.</p>
 </div>
 
 **The first Solana wallet designed FOR autonomous agents. No passwords, no prompts, no friction. Just instant transaction signing and submission.**
