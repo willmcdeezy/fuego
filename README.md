@@ -166,7 +166,7 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 ## 🛠️ Development
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (1.70+)
+- [Rust](https://rustup.rs/) (1.85+) - **Required for macOS compatibility**
 - [Node.js](https://nodejs.org/) (18+)  
 - [Python](https://python.org/) (3.8+)
 
