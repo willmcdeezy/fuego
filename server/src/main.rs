@@ -13,8 +13,8 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::message::Message;
 use solana_sdk::transaction::Transaction;
-use solana_sdk::hash::Hash;
 use solana_sdk::signer::Signer;
+use std::str::FromStr;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::instruction as token_instruction;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
@@ -159,6 +159,8 @@ struct X402Extra {
     decimals: u8,
     #[serde(rename = "recentBlockhash")]
     recent_blockhash: String,
+    #[serde(default)]
+    features: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -955,6 +957,8 @@ async fn x402_request(
     State(_state): State<AppState>,
     Json(payload): Json<X402Request>,
 ) -> Response {
+    // Generic x402 handler - SOLANA ONLY
+    // Fuego's edge: focused Solana-first approach
     let client = reqwest::Client::new();
     
     // Step 1: Make initial request
@@ -1037,17 +1041,17 @@ async fn x402_request(
         }
     };
 
-    // Step 3: Find Solana payment requirement
+    // Step 3: Find Solana payment requirement (Solana-only focus)
     let solana_req = x402_response.accepts.iter()
-        .find(|req| req.network == "solana" || req.network == "solana-mainnet-beta")
-        .or_else(|| x402_response.accepts.first());
+        .find(|req| req.network == "solana" || req.network == "solana-mainnet-beta");
 
     let solana_req = match solana_req {
         Some(req) => req,
         None => {
             return Json(json!({
                 "success": false,
-                "error": "No Solana payment requirement found"
+                "error": "This API doesn't support Solana payments. Fuego only supports Solana x402 payments.",
+                "supported_networks": x402_response.accepts.iter().map(|a| &a.network).collect::<Vec<_>>()
             })).into_response();
         }
     };
@@ -1102,7 +1106,7 @@ async fn x402_request(
         Err(_) => {
             return Json(json!({
                 "success": false,
-                "error": "Invalid fee payer address"
+                "error": "Invalid fee payer address in Solana payment requirement"
             })).into_response();
         }
     };
@@ -1122,7 +1126,7 @@ async fn x402_request(
         Err(_) => {
             return Json(json!({
                 "success": false,
-                "error": "Invalid blockhash format"
+                "error": "Invalid blockhash format in Solana payment requirement"
             })).into_response();
         }
     };
@@ -1179,7 +1183,7 @@ async fn x402_request(
     }
 
     // Step 7: Create x402 payment payload
-    let serialized_tx = match transaction.serialize(&[]) {
+    let serialized_tx = match bincode::serialize(&transaction) {
         Ok(bytes) => bytes,
         Err(e) => {
             return Json(json!({
@@ -1360,8 +1364,8 @@ async fn main() {
     println!("  HISTORY:");
     println!("    POST /transaction-history - Get Fuego transactions (filtered)");
     println!("    POST /all-transactions - Get all transactions (unfiltered)");
-  X402:");
-    println!("    POST /x402-request - Generic x402 payment handler (any service)");
+  println!("  X402:");
+    println!("    POST /x402-request - Solana x402 payment handler (Solana-only focus)");
     println!("  TODO:");
     println!("    POST /pyusd-balance - Get PYUSD (Token-2022) balance");
 
