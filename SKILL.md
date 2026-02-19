@@ -8,7 +8,7 @@ metadata:
       {
         "emoji": "🔥",
         "requires": { "bins": ["curl"], "env": [] },
-        "optional": { "bins": ["python3", "node", "npm"] },
+        "optional": { "bins": ["python3"] },
       },
   }
 ---
@@ -42,10 +42,6 @@ Traditional Solana wallets break agent workflows:
 git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 
-# Install dependencies and build
-npm install
-npm run build
-
 # Build server
 cd server && cargo build --release
 ```
@@ -53,7 +49,8 @@ cd server && cargo build --release
 ### 2. Initialize Wallet (Password-Free!)
 ```bash
 # Create agent-ready wallet (no password required!)
-npm run init
+# Use the wallet initialization script (Python-based)
+python3 scripts/init_wallet.py
 
 # Output:
 # ✅ Address: DmFyLRiJtc4Bz75hjAqPaEJpDfRe4GEnRLPwc3EgeUZF
@@ -378,81 +375,6 @@ signature = agent.send_sol("GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5", 0.001
 print(f"Sent! Signature: {signature}")
 ```
 
-### TypeScript/Node.js Integration
-```typescript
-import fetch from 'node-fetch';
-import { FuegoWallet } from './src/index';
-
-class FuegoAgent {
-    private serverUrl = 'http://127.0.0.1:8080';
-    private wallet?: FuegoWallet;
-    
-    async getWalletAddress(): Promise<string> {
-        const response = await fetch(`${this.serverUrl}/wallet-address`);
-        const data = await response.json();
-        return data.data.address;
-    }
-    
-    async checkBalance(): Promise<number> {
-        const address = await this.getWalletAddress();
-        const response = await fetch(`${this.serverUrl}/balance`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({network: 'mainnet-beta', address})
-        });
-        const data = await response.json();
-        return data.data.sol;
-    }
-    
-    async sendSOL(toAddress: string, amount: number): Promise<string> {
-        // Load wallet for signing
-        if (!this.wallet) {
-            this.wallet = new FuegoWallet();
-            await this.wallet.load();  // No password required!
-        }
-        
-        // Build transaction
-        const buildResponse = await fetch(`${this.serverUrl}/build-transfer-sol`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                network: 'mainnet-beta',
-                from_address: await this.getWalletAddress(),
-                to_address: toAddress,
-                amount: amount.toString(),
-                yid: `agent-${Date.now()}`
-            })
-        });
-        
-        const {data: buildData} = await buildResponse.json();
-        
-        // Sign transaction (instant, no password!)
-        const signedTx = await this.wallet.signTransaction(buildData.transaction);
-        
-        // Submit transaction
-        const submitResponse = await fetch(`${this.serverUrl}/submit-transaction`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                network: 'mainnet-beta',
-                transaction: signedTx
-            })
-        });
-        
-        const {data: submitData} = await submitResponse.json();
-        return submitData.signature;
-    }
-}
-
-// Usage
-const agent = new FuegoAgent();
-console.log(`Wallet: ${await agent.getWalletAddress()}`);
-console.log(`Balance: ${await agent.checkBalance()} SOL`);
-
-const signature = await agent.sendSOL("GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5", 0.001);
-console.log(`Transaction: https://explorer.solana.com/tx/${signature}`);
-```
-
 ---
 
 ## 💰 Agent Deposit Integration
@@ -584,14 +506,6 @@ fuego/
 ├── README.md           # Main documentation
 ├── SKILL.md           # This file (agent integration guide)
 ├── ROADMAP.md         # Future plans
-├── package.json       # Node.js dependencies
-├── tsconfig.json      # TypeScript configuration
-├── src/               # TypeScript wallet library
-│   ├── index.ts       # Main FuegoWallet class
-│   ├── types.ts       # Type definitions  
-│   ├── crypto.ts      # Wallet utilities (no passwords!)
-│   └── cli/
-│       └── init.ts    # Wallet initialization
 ├── scripts/           # Agent-ready transaction scripts
 │   └── sign_and_submit.py  # Python transaction tool
 ├── server/            # Rust HTTP server
@@ -604,26 +518,20 @@ fuego/
     └── README.md      # Dashboard documentation
 ```
 
+### Prerequisites
+- [Rust](https://rustup.rs/) (1.85+) - **Required for macOS compatibility**
+- [Python](https://python.org/) (3.8+) - For transaction scripts
+
 ### Building from Source
 ```bash
 # 1. Clone repository
 git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 
-# 2. Install Node.js dependencies  
-npm install
-
-# 3. Build TypeScript
-npm run build
-
-# 4. Build Rust server
+# 2. Build Rust server
 cd server
 cargo build --release
 # Binary: target/release/fuego-server
-
-# 5. Run tests
-cd ..
-npm test
 ```
 
 ### Customizing for Your Agents
@@ -662,12 +570,10 @@ sudo useradd -m -s /bin/bash fuego-agent
 # 2. Install Fuego
 sudo -u fuego-agent git clone https://github.com/willmcdeezy/fuego.git /home/fuego-agent/fuego
 cd /home/fuego-agent/fuego
-sudo -u fuego-agent npm install
-sudo -u fuego-agent npm run build
 cd server && sudo -u fuego-agent cargo build --release
 
 # 3. Initialize wallet
-sudo -u fuego-agent npm run init
+sudo -u fuego-agent python3 scripts/init_wallet.py
 
 # 4. Create systemd service
 sudo tee /etc/systemd/system/fuego.service << EOF
@@ -715,7 +621,7 @@ curl http://127.0.0.1:8080/wallet-address
 **Problem: "Wallet not initialized" error**
 ```bash
 # Solution: Initialize wallet
-npm run init
+python3 scripts/init_wallet.py
 ```
 
 **Problem: "Server not running" error**  
