@@ -106,7 +106,7 @@ start dashboard/dashboard.html   # Windows
 
 **Dashboard Features:**
 - 💰 **Real-time balances** (SOL, USDC, USDT) with USD values
-- 📊 **Transaction history** - Fuego transactions + All transactions  
+- 📊 **Transaction history** - All transactions with Fuego-styled entries  
 - 🔄 **One-click refresh** - No page reloads needed
 - 🌓 **Dark/Light themes** - Automatic system detection
 - 🔗 **Explorer links** - Direct to Solana Explorer
@@ -336,20 +336,7 @@ curl -X POST http://127.0.0.1:8080/submit-transaction \\
 
 ### History Endpoints
 
-#### POST /transaction-history - Get Fuego Transactions (Filtered)
-```bash
-curl -X POST http://127.0.0.1:8080/transaction-history \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "network": "mainnet-beta",
-    "address": "YOUR_ADDRESS", 
-    "limit": 10
-  }'
-```
-
-Returns transactions with Fuego memo format (parsed by dashboard).
-
-#### POST /all-transactions - Get All Transactions (Unfiltered)  
+#### POST /all-transactions - Get All Transactions
 ```bash
 curl -X POST http://127.0.0.1:8080/all-transactions \\
   -H "Content-Type: application/json" \\
@@ -360,7 +347,7 @@ curl -X POST http://127.0.0.1:8080/all-transactions \\
   }'
 ```
 
-Returns all wallet transactions (signature + timestamp only).
+Returns all wallet transactions. Fuego transactions (those with `fuego|` in the memo) are styled with rich details (token icon, amount, from/to, 🔥 Sent/Received badge) in the dashboard. Regular transactions show simplified styling.
 
 ---
 
