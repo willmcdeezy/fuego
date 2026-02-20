@@ -1,0 +1,22 @@
+🔥 Fuego server running on http://127.0.0.1:8080
+Endpoints:
+  READ:
+    GET  /health - Health check
+    GET  /network - Get default network
+    GET  /wallet-address - Get local wallet address
+    POST /latest-hash - Get latest blockhash
+    POST /balance - Get SOL balance
+    POST /usdc-balance - Get USDC balance
+    POST /usdt-balance - Get USDT balance
+  TRANSFER:
+    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)
+    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)
+    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)
+    POST /submit-transaction - Broadcast signed transaction
+  HISTORY:
+    POST /transaction-history - Get Fuego transactions (filtered)
+    POST /all-transactions - Get all transactions (unfiltered)
+  X402:
+    POST /x402-request - Solana x402 payment handler (Solana-only focus)
+  TODO:
+    POST /pyusd-balance - Get PYUSD (Token-2022) balance

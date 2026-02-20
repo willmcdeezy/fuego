@@ -12,7 +12,7 @@ use serde_json::json;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::message::Message;
-use solana_sdk::transaction::Transaction;
+use solana_sdk::transaction::{Transaction, VersionedTransaction};
 use solana_sdk::signer::Signer;
 use std::str::FromStr;
 use spl_associated_token_account::get_associated_token_address;
@@ -154,13 +154,29 @@ struct X402PaymentRequirement {
 
 #[derive(Serialize, Deserialize)]
 struct X402Extra {
+    // Use Option for parsing, but require for Solana logic
     #[serde(rename = "feePayer")]
-    fee_payer: String,
-    decimals: u8,
+    fee_payer: Option<String>,
+    decimals: Option<u8>,
     #[serde(rename = "recentBlockhash")]
-    recent_blockhash: String,
+    recent_blockhash: Option<String>,
     #[serde(default)]
     features: Option<serde_json::Value>,
+    // Ignore non-Solana fields completely
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<serde_json::Value>,
+    #[serde(default)] 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<serde_json::Value>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "chainId")]
+    chain_id: Option<serde_json::Value>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "verifyingContract")]
+    verifying_contract: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -847,6 +863,66 @@ async fn submit_transaction(
     }
 }
 
+// VersionedTransaction endpoint specifically for Jupiter swaps and other v0 transactions
+async fn submit_versioned_transaction(
+    State(_state): State<AppState>,
+    Json(payload): Json<SubmitTransactionRequest>,
+) -> Response {
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    // Decode base64 transaction
+    let tx_bytes = match general_purpose::STANDARD.decode(&payload.transaction) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to decode transaction - invalid base64"
+            }))
+            .into_response();
+        }
+    };
+
+    // Deserialize as VersionedTransaction (Jupiter format)
+    let versioned_transaction: VersionedTransaction = match bincode::deserialize(&tx_bytes) {
+        Ok(tx) => tx,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to deserialize VersionedTransaction - ensure this is a v0 transaction format"
+            }))
+            .into_response();
+        }
+    };
+
+    // Submit VersionedTransaction to RPC (already signed by agent)
+    match rpc.send_transaction(&versioned_transaction) {
+        Ok(signature) => {
+            let sig_string = signature.to_string();
+            let explorer_link = format!(
+                "https://explorer.solana.com/tx/{}?cluster={}",
+                sig_string, payload.network
+            );
+            Json(json!({
+                "success": true,
+                "data": {
+                    "signature": sig_string,
+                    "explorer_link": explorer_link,
+                    "network": payload.network,
+                    "status": "submitted",
+                    "transaction_type": "VersionedTransaction"
+                }
+            }))
+            .into_response()
+        },
+        Err(e) => Json(json!({
+            "success": false,
+            "error": format!("Failed to submit VersionedTransaction: {}", e)
+        }))
+        .into_response(),
+    }
+}
+
 async fn get_fuego_transactions(
     Json(payload): Json<GetAccountSignatures>,
 ) -> Response {
@@ -1043,7 +1119,9 @@ async fn x402_request(
 
     // Step 3: Find Solana payment requirement (Solana-only focus)
     let solana_req = x402_response.accepts.iter()
-        .find(|req| req.network == "solana" || req.network == "solana-mainnet-beta");
+        .find(|req| (req.network == "solana" || req.network == "solana-mainnet-beta") 
+            && req.extra.fee_payer.is_some() 
+            && req.extra.recent_blockhash.is_some());
 
     let solana_req = match solana_req {
         Some(req) => req,
@@ -1101,7 +1179,7 @@ async fn x402_request(
         }
     };
 
-    let fee_payer = match string_to_pub_key(&solana_req.extra.fee_payer) {
+    let fee_payer = match string_to_pub_key(solana_req.extra.fee_payer.as_ref().unwrap()) {
         Ok(pk) => pk,
         Err(_) => {
             return Json(json!({
@@ -1121,7 +1199,7 @@ async fn x402_request(
         }
     };
 
-    let blockhash = match solana_sdk::hash::Hash::from_str(&solana_req.extra.recent_blockhash) {
+    let blockhash = match solana_sdk::hash::Hash::from_str(solana_req.extra.recent_blockhash.as_ref().unwrap()) {
         Ok(hash) => hash,
         Err(_) => {
             return Json(json!({
@@ -1154,7 +1232,7 @@ async fn x402_request(
         &from_pubkey,
         &[&from_pubkey],
         amount,
-        solana_req.extra.decimals,
+        solana_req.extra.decimals.unwrap_or(6),
     ).unwrap();
 
     // Compute budget instructions (required by facilitators)
@@ -1262,7 +1340,7 @@ async fn x402_request(
             "amount": amount,
             "amount_usdc": amount as f64 / 1_000_000.0,
             "recipient": solana_req.pay_to,
-            "fee_payer": solana_req.extra.fee_payer
+            "fee_payer": solana_req.extra.fee_payer.as_ref().unwrap()
         }
     })).into_response()
 }
@@ -1340,6 +1418,7 @@ async fn main() {
         .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/build-transfer-usdt", post(build_transfer_usdt))
         .route("/submit-transaction", post(submit_transaction))
+        .route("/submit-versioned-transaction", post(submit_versioned_transaction))
         // x402 endpoints
         .route("/x402-request", post(x402_request))
         .layer(cors)
@@ -1360,7 +1439,8 @@ async fn main() {
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
     println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)");
-    println!("    POST /submit-transaction - Broadcast signed transaction");
+    println!("    POST /submit-transaction - Broadcast signed transaction (legacy format)");
+    println!("    POST /submit-versioned-transaction - Broadcast VersionedTransaction (Jupiter/v0 format)");
     println!("  HISTORY:");
     println!("    POST /transaction-history - Get Fuego transactions (filtered)");
     println!("    POST /all-transactions - Get all transactions (unfiltered)");
