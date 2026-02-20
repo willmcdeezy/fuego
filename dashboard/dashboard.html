@@ -192,45 +192,6 @@
             cursor: not-allowed;
         }
 
-        /* Transaction Segments */
-        .segment-tabs {
-            display: flex;
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            padding: 4px;
-            margin-bottom: 16px;
-            border: 1px solid var(--border-color);
-        }
-
-        .segment-tab {
-            flex: 1;
-            padding: 8px 16px;
-            background: transparent;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            color: var(--text-secondary);
-            transition: all 0.2s;
-            text-align: center;
-        }
-
-        .segment-tab.active {
-            background: var(--accent-purple);
-            color: white;
-            font-weight: 600;
-        }
-
-        .segment-tab:not(.active):hover {
-            color: var(--text-primary);
-            background: var(--bg-tertiary);
-        }
-
-        .segment-tab:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
         .segment-loading {
             display: flex;
             align-items: center;
@@ -502,18 +463,11 @@
             </button>
         </div>
         
-        <!-- Transaction Segments -->
-        <div class="segment-tabs">
-            <button class="segment-tab active" onclick="switchSegment('fuego')" id="fuegoTab">
-                Fuego Transactions
-            </button>
-            <button class="segment-tab" onclick="switchSegment('all')" id="allTab">
-                All Transactions
-            </button>
-        </div>
-        
         <div class="tx-list" id="txList">
-            <div class="no-transactions">No transactions yet</div>
+            <div class="segment-loading">
+                <div class="segment-spinner"></div>
+                <span>Loading transactions...</span>
+            </div>
         </div>
 
         <!-- Footer -->
@@ -526,8 +480,13 @@
         const API_URL = 'http://127.0.0.1:8080';
         const NETWORK = 'mainnet-beta';
         
-        // Track current transaction segment
-        let currentSegment = 'fuego';
+        // Transaction cache to prevent repeated API calls
+        const txCache = {
+            data: null,
+            timestamp: 0,
+            address: null
+        };
+        const CACHE_TTL_MS = 60000; // 1 minute cache
         
         // CoinGecko API for token prices (free tier)
         const COINGECKO_API = 'https://api.coingecko.com/api/v3';
@@ -544,12 +503,8 @@
                 const address = await getWalletAddress();
                 document.getElementById('address').textContent = address;
                 await loadBalances(address);
-                // Load transactions based on current segment (default: fuego)
-                if (currentSegment === 'fuego') {
-                    await loadTransactions(address);
-                } else {
-                    await loadAllTransactions(address);
-                }
+                // Load all transactions (Fuego ones will be styled specially)
+                await loadAllTransactions(address);
             } catch (error) {
                 showError(error.message);
             }
@@ -738,6 +693,7 @@
 
         function parseMemo(memo) {
             // Memo format: [size] fuego|{token}|f:{from}|t:{to}|a:{amount}|yid:{yid}|n:{notes}
+            // OR just: fuego|{token}|f:{from}|t:{to}|a:{amount}|yid:{yid}|n:{notes}
             const parsed = {
                 token: 'unknown',
                 from: '',
@@ -751,12 +707,17 @@
 
             // Handle memo that starts with [size] prefix
             let cleanMemo = memo;
-            if (memo.includes('fuego|')) {
-                // Find the 'fuego|' part and start from there
-                const fuegoIndex = memo.indexOf('fuego|');
-                if (fuegoIndex > 0) {
-                    cleanMemo = memo.substring(fuegoIndex);
-                }
+            
+            // Remove [number] prefix if present
+            const sizeMatch = memo.match(/^\[\d+\]\s*/);
+            if (sizeMatch) {
+                cleanMemo = memo.substring(sizeMatch[0].length);
+            }
+            
+            // Also handle fuego| in the middle (shouldn't happen but just in case)
+            if (cleanMemo.includes('fuego|') && !cleanMemo.startsWith('fuego|')) {
+                const fuegoIndex = cleanMemo.indexOf('fuego|');
+                cleanMemo = cleanMemo.substring(fuegoIndex);
             }
 
             const parts = cleanMemo.split('|');
@@ -785,90 +746,6 @@
             return parsed;
         }
 
-        async function loadTransactions(address) {
-            const container = document.getElementById('txList');
-            
-            try {
-                const res = await fetch(`${API_URL}/transaction-history`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ network: NETWORK, address, limit: 10 })
-                });
-                
-                if (!res.ok) {
-                    console.log('Transaction fetch failed:', res.status);
-                    return;
-                }
-
-                const data = await res.json();
-                console.log('get_fuego_transactions response:', JSON.stringify(data, null, 2));
-
-                if (!data.success || !data.data || data.data.length === 0) {
-                    return;
-                }
-
-                let html = '';
-                data.data.forEach(txSig => {
-                    // Parse the memo to extract transaction details
-                    const memo = txSig.memo || '';
-                    const tx = parseMemo(memo);
-                    
-                    const isOutgoing = tx.from === address;
-                    const fromFormatted = formatAddress(tx.from);
-                    const toFormatted = formatAddress(tx.to);
-                    
-                    // Format timestamp properly
-                    let timestamp = '';
-                    if (txSig.blockTime) {
-                        const date = new Date(txSig.blockTime * 1000);
-                        timestamp = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    }
-                    
-                    // Status for inline display
-                    const isFinalized = txSig.confirmationStatus === 'finalized';
-                    
-                    const largeTokenIcon = getTokenIcon(tx.token, '24px');
-                    const direction = isOutgoing ? 'Sent' : 'Received';
-                    const statusText = isFinalized ? 'Finalized' : 'Pending';
-                    
-                    // Format amount with proper decimals and currency
-                    const humanAmount = formatAmount(tx.amount, tx.token);
-                    let formattedAmount = humanAmount;
-                    if (tx.token === 'USDC' || tx.token === 'USDT') {
-                        formattedAmount = '$' + humanAmount;
-                    }
-                    
-                    html += `
-                        <div class="tx-item">
-                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                                ${largeTokenIcon}
-                                <div class="tx-info">
-                                    <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                                        ${direction} ${formattedAmount} <span style="font-weight: 400; color: var(--text-secondary);">${tx.token}</span>
-                                    </div>
-                                    <div class="tx-signature" style="margin-top: 2px; font-family: 'Monaco', 'Menlo', monospace; font-size: 11px; color: var(--text-secondary);">${txSig.signature.substring(0, 16)}...</div>
-                                    <div class="tx-detail" style="font-size: 11px; margin-top: 4px;">
-                                        <strong style="color: var(--text-primary);">From:</strong> <span style="color: var(--text-secondary);">${fromFormatted}</span> • 
-                                        <strong style="color: var(--text-primary);">To:</strong> <span style="color: var(--text-secondary);">${toFormatted}</span>
-                                    </div>
-                                    <div class="tx-time" style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
-                                        ${timestamp} • <span style="color: ${isFinalized ? '#10b981' : '#f59e0b'}; font-weight: 500;">${statusText}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="tx-link">
-                                <a href="https://explorer.solana.com/tx/${txSig.signature}?cluster=${NETWORK}" target="_blank">View</a>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                if (html) container.innerHTML = html;
-            } catch (error) {
-                // Silently fail - endpoint not ready
-            }
-        }
-
         async function refreshTransactions() {
             const btn = document.getElementById('refreshBtn');
             const btnText = btn.querySelector('span');
@@ -879,14 +756,10 @@
             btnText.textContent = 'Refreshing...';
             
             try {
-                // Get current wallet address and load correct segment
+                // Get current wallet address and force refresh
                 const address = document.getElementById('address').textContent;
                 if (address && address !== 'Loading...') {
-                    if (currentSegment === 'fuego') {
-                        await loadTransactions(address);
-                    } else {
-                        await loadAllTransactions(address);
-                    }
+                    await loadAllTransactions(address, true); // Force refresh
                 }
             } catch (error) {
                 console.error('Failed to refresh transactions:', error);
@@ -897,8 +770,17 @@
             }
         }
 
-        async function loadAllTransactions(address) {
+        async function loadAllTransactions(address, forceRefresh = false) {
             const container = document.getElementById('txList');
+            
+            // Check cache first
+            const cache = txCache;
+            const now = Date.now();
+            if (!forceRefresh && cache.data && cache.address === address && (now - cache.timestamp) < CACHE_TTL_MS) {
+                console.log('Using cached transactions');
+                renderAllTransactions(cache.data, address);
+                return;
+            }
             
             try {
                 const res = await fetch(`${API_URL}/all-transactions`, {
@@ -909,19 +791,105 @@
                 
                 if (!res.ok) {
                     console.log('All transactions fetch failed:', res.status);
+                    // Try to show cached data even if fetch fails
+                    if (cache.data && cache.address === address) {
+                        renderAllTransactions(cache.data, address);
+                    }
                     return;
                 }
 
                 const data = await res.json();
                 console.log('All transactions response:', JSON.stringify(data, null, 2));
 
-                if (!data.success || !data.data || data.data.length === 0) {
-                    container.innerHTML = '<div class="no-transactions">No transactions found</div>';
-                    return;
-                }
+                // Cache the response
+                txCache.data = data;
+                txCache.timestamp = now;
+                txCache.address = address;
 
-                let html = '';
-                data.data.forEach(tx => {
+                renderAllTransactions(data, address);
+                
+            } catch (error) {
+                console.error('Failed to load all transactions:', error);
+                // Try to show cached data on error
+                if (cache.data && cache.address === address) {
+                    renderAllTransactions(cache.data, address);
+                } else {
+                    container.innerHTML = '<div class="no-transactions">Failed to load transactions</div>';
+                }
+            }
+        }
+        
+        function renderAllTransactions(data, address) {
+            const container = document.getElementById('txList');
+            
+            if (!data.success || !data.data || data.data.length === 0) {
+                container.innerHTML = '<div class="no-transactions">No transactions found</div>';
+                return;
+            }
+
+            let html = '';
+            data.data.forEach(tx => {
+                // Check if this is a Fuego transaction
+                const isFuego = tx.memo && tx.memo.includes('fuego|');
+                
+                if (isFuego) {
+                    // Parse the memo to extract transaction details
+                    const memo = tx.memo || '';
+                    const txDetails = parseMemo(memo);
+                    
+                    const isOutgoing = txDetails.from === address;
+                    const fromFormatted = formatAddress(txDetails.from);
+                    const toFormatted = formatAddress(txDetails.to);
+                    
+                    // Format timestamp properly
+                    let timestamp = '';
+                    if (tx.blockTime) {
+                        const date = new Date(tx.blockTime * 1000);
+                        timestamp = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+                    
+                    // Status for inline display
+                    const isFinalized = tx.confirmationStatus === 'finalized';
+                    
+                    const largeTokenIcon = getTokenIcon(txDetails.token, '24px');
+                    const directionLabel = isOutgoing ? '🔥 Sent' : '🔥 Received';
+                    const statusText = isFinalized ? 'Finalized' : 'Pending';
+                    
+                    // Format amount with proper decimals and currency
+                    const humanAmount = formatAmount(txDetails.amount, txDetails.token);
+                    let formattedAmount = humanAmount;
+                    if (txDetails.token === 'USDC' || txDetails.token === 'USDT') {
+                        formattedAmount = '$' + humanAmount;
+                    }
+                    
+                    html += `
+                        <div class="tx-item">
+                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                                ${largeTokenIcon}
+                                <div class="tx-info">
+                                    <div style="font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                        ${formattedAmount} <span style="font-weight: 400; color: var(--text-secondary);">${txDetails.token}</span>
+                                    </div>
+                                    <div class="tx-signature" style="margin-top: 2px; font-family: 'Monaco', 'Menlo', monospace; font-size: 11px; color: var(--text-secondary);">${tx.signature.substring(0, 16)}...</div>
+                                    <div class="tx-detail" style="font-size: 11px; margin-top: 4px;">
+                                        <strong style="color: var(--text-primary);">From:</strong> <span style="color: var(--text-secondary);">${fromFormatted}</span> • 
+                                        <strong style="color: var(--text-primary);">To:</strong> <span style="color: var(--text-secondary);">${toFormatted}</span>
+                                    </div>
+                                    <div class="tx-time" style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        ${timestamp} • <span style="color: ${isFinalized ? '#10b981' : '#f59e0b'}; font-weight: 500;">${statusText}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span style="font-weight: 600; color: var(--accent-orange); font-size: 13px; white-space: nowrap;">${directionLabel}</span>
+                                <div class="tx-link">
+                                    <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Regular transaction - simple styling
                     // Format timestamp
                     let timestamp = '';
                     if (tx.blockTime) {
@@ -952,64 +920,10 @@
                             </div>
                         </div>
                     `;
-                });
-
-                container.innerHTML = html;
-            } catch (error) {
-                console.error('Failed to load all transactions:', error);
-                container.innerHTML = '<div class="no-transactions">Failed to load transactions</div>';
-            }
-        }
-
-        async function switchSegment(segment) {
-            const container = document.getElementById('txList');
-            const fuegoTab = document.getElementById('fuegoTab');
-            const allTab = document.getElementById('allTab');
-            
-            // Don't switch if already on this segment or if loading
-            if (currentSegment === segment || fuegoTab.disabled) {
-                return;
-            }
-            
-            try {
-                // Show loading state immediately
-                container.innerHTML = `
-                    <div class="segment-loading">
-                        <div class="segment-spinner"></div>
-                        <span>Loading ${segment === 'fuego' ? 'Fuego' : 'All'} transactions...</span>
-                    </div>
-                `;
-                
-                // Disable both tabs during loading
-                fuegoTab.disabled = true;
-                allTab.disabled = true;
-                
-                // Update segment state and tab styles
-                currentSegment = segment;
-                fuegoTab.classList.toggle('active', segment === 'fuego');
-                allTab.classList.toggle('active', segment === 'all');
-                
-                // Add a small delay for smooth UX (prevents jarring instant switch)
-                await new Promise(resolve => setTimeout(resolve, 400));
-                
-                // Load transactions for the selected segment
-                const address = document.getElementById('address').textContent;
-                if (address && address !== 'Loading...') {
-                    if (segment === 'fuego') {
-                        await loadTransactions(address);
-                    } else {
-                        await loadAllTransactions(address);
-                    }
                 }
-                
-            } catch (error) {
-                console.error('Failed to switch segment:', error);
-                container.innerHTML = '<div class="no-transactions">Failed to load transactions</div>';
-            } finally {
-                // Re-enable tabs
-                fuegoTab.disabled = false;
-                allTab.disabled = false;
-            }
+            });
+
+            container.innerHTML = html;
         }
 
         function copyAddress() {
