@@ -9,7 +9,7 @@ The official Fuego brand theme combines dark sophistication with warm energy.
 
 Background Primary:   #1a1a1a  (Dark Charcoal)
 Background Secondary: #242424  (Lighter Charcoal)
-Accent Primary:       #fbbf24  (Golden Amber)
+Accent Primary:       #F85A30  (Fuego Orange-Red)
 Accent Secondary:     #f59e0b  (Warm Orange)
 Accent Success:       #10b981  (Success Green)
 Text Primary:         #f5f5f5  (Off-white)
@@ -48,7 +48,7 @@ Background Secondary: #f8f9fa  (Light Gray)
 Text Primary:         #1a1a1a  (Dark Gray)
 Text Secondary:       #6b7280  (Medium Gray)
 Border:               #e5e7eb  (Light Border)
-Accent Primary:       #fbbf24  (Golden Amber) ← keeps brand consistency
+Accent Primary:       #F85A30  (Fuego Orange-Red) ← consistent with dark mode
 ```
 
 ---
@@ -60,23 +60,25 @@ All themes use CSS custom properties in `dashboard.html`:
 
 ```css
 :root {
-  /* Fuego Flame (Dark Mode - Default) */
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #242424;
-  --accent-primary: #fbbf24;
-  --accent-secondary: #f59e0b;
-  --accent-success: #10b981;
-  --text-primary: #f5f5f5;
-  --text-secondary: #a8a8a8;
-  --border-color: #333333;
-}
-
-@media (prefers-color-scheme: light) {
-  /* Light mode for accessibility */
+  /* Light Mode (Default) */
   --bg-primary: #ffffff;
   --bg-secondary: #f8f9fa;
+  --accent-purple: #F85A30;  /* Fuego Orange-Red - same in both modes */
+  --accent-green: #10b981;
   --text-primary: #1a1a1a;
   --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  /* Dark mode */
+  --bg-primary: #0f1419;
+  --bg-secondary: #1a202c;
+  --accent-purple: #F85A30;  /* Fuego Orange-Red - consistent branding */
+  --accent-green: #10b981;
+  --text-primary: #f5f7fa;
+  --text-secondary: #a0aec0;
+  --border-color: #2d3748;
 }
 ```
 
