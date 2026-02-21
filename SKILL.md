@@ -698,7 +698,9 @@ fuego/
 │   ├── cli/           # Compiled CLI scripts
 │   └── __tests__/     # Compiled tests
 ├── scripts/           # Agent-ready transaction scripts
-│   └── sign_and_submit.py  # Python transaction tool
+│   ├── sign_and_submit.py           # Python transaction tool
+│   ├── x402_faremeter.ts            # x402 payment handler
+│   └── x402_jupiter_fresh_blockhash.mjs  # Jupiter swaps via x402
 ├── server/            # Rust HTTP server
 │   ├── Cargo.toml     # Rust dependencies
 │   └── src/
