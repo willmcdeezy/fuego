@@ -5,11 +5,11 @@ import {
   saveWalletToFile, 
   loadWalletFromFile,
   isValidWalletFile
-} from './crypto'
+} from './crypto.js'
 import {
   WalletConfig,
   FuegoConfig
-} from './types'
+} from './types.js'
 
 export class FuegoWallet {
   private config: FuegoConfig
@@ -128,5 +128,5 @@ export class FuegoWallet {
 }
 
 // Export utilities for direct use
-export { saveWalletToFile, loadWalletFromFile, isValidWalletFile } from './crypto'
-export * from './types'
+export { saveWalletToFile, loadWalletFromFile, isValidWalletFile } from './crypto.js'
+export * from './types.js'

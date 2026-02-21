@@ -1,7 +1,7 @@
 // Simple wallet utilities - NO PASSWORD COMPLEXITY!
 import fs from 'fs'
 import { Keypair } from '@solana/web3.js'
-import { WalletStore } from './types'
+import { WalletStore } from './types.js'
 
 /**
  * Save keypair to simple JSON format (like Solana CLI)
