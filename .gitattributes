@@ -1,0 +1,13 @@
+# Binary files
+server/target/release/fuego-server binary
+server/target/release/fuego-server.exe binary
+*.exe binary
+*.bin binary
+
+# Ensure line endings are consistent
+*.rs text eol=lf
+*.toml text eol=lf
+*.ts text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf

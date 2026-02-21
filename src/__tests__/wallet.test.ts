@@ -1,58 +1,110 @@
+import { describe, test, expect, beforeEach, afterEach } from '@jest/globals'
+import fs from 'fs'
+import path from 'path'
 import { Keypair } from '@solana/web3.js'
-import { testEncryption } from '../crypto'
-import { FuegoWallet } from '../index'
+import { FuegoWallet, saveWalletToFile, loadWalletFromFile } from '../index.js'
 
-describe('Fuego Wallet - Phase 1', () => {
-  test('encryption should work', async () => {
-    const result = await testEncryption()
-    expect(result).toBe(true)
+const TEST_DIR = '/tmp/fuego-test'
+const TEST_WALLET_PATH = path.join(TEST_DIR, 'test-wallet.json')
+
+describe('FuegoWallet - Simplified Edition', () => {
+  let testKeypair: Keypair
+
+  beforeEach(() => {
+    // Create test directory
+    if (!fs.existsSync(TEST_DIR)) {
+      fs.mkdirSync(TEST_DIR, { recursive: true })
+    }
+    
+    // Generate test keypair
+    testKeypair = Keypair.generate()
   })
 
-  test('wallet should initialize and authenticate', async () => {
-    const keypair = Keypair.generate()
-    const password = 'test-password-123'
-    
-    const wallet = new FuegoWallet({
-      configPath: '/tmp/fuego-test-config.json',
-      keychainPath: '/tmp/fuego-test-keychain.json',
-      saltPath: '/tmp/fuego-test-salt.json',
-      logsPath: '/tmp/fuego-test-logs'
-    })
-
-    await wallet.initialize(keypair, password)
-    expect(wallet.getAddress()).toBe(keypair.publicKey.toString())
-
-    // Should fail with wrong password
-    await expect(wallet.authenticate('wrong-password')).rejects.toThrow('Invalid password')
-
-    // Should succeed with correct password
-    await wallet.authenticate(password)
-    expect(true).toBe(true)
-
-    wallet.logout()
+  afterEach(() => {
+    // Clean up test files
+    if (fs.existsSync(TEST_DIR)) {
+      fs.rmSync(TEST_DIR, { recursive: true, force: true })
+    }
   })
 
-  test('session should timeout', async () => {
-    const keypair = Keypair.generate()
-    const password = 'test-password'
+  test('saves and loads wallet without passwords', () => {
+    // Save wallet
+    saveWalletToFile(testKeypair, TEST_WALLET_PATH)
     
+    // Verify file exists and has correct permissions
+    expect(fs.existsSync(TEST_WALLET_PATH)).toBe(true)
+    const stats = fs.statSync(TEST_WALLET_PATH)
+    expect(stats.mode & 0o777).toBe(0o600)  // User read/write only
+    
+    // Load wallet
+    const loadedKeypair = loadWalletFromFile(TEST_WALLET_PATH)
+    
+    // Verify keypairs match
+    expect(loadedKeypair.publicKey.toString()).toBe(testKeypair.publicKey.toString())
+    expect(loadedKeypair.secretKey).toEqual(testKeypair.secretKey)
+  })
+
+  test('wallet file has correct JSON structure', () => {
+    saveWalletToFile(testKeypair, TEST_WALLET_PATH, 'devnet')
+    
+    const walletData = JSON.parse(fs.readFileSync(TEST_WALLET_PATH, 'utf-8'))
+    
+    expect(walletData).toHaveProperty('privateKey')
+    expect(walletData).toHaveProperty('address')
+    expect(walletData).toHaveProperty('network')
+    
+    expect(Array.isArray(walletData.privateKey)).toBe(true)
+    expect(walletData.privateKey.length).toBe(64)
+    expect(walletData.address).toBe(testKeypair.publicKey.toString())
+    expect(walletData.network).toBe('devnet')
+  })
+
+  test('FuegoWallet initializes without passwords', async () => {
     const wallet = new FuegoWallet({
-      configPath: '/tmp/fuego-test-config-2.json',
-      keychainPath: '/tmp/fuego-test-keychain-2.json',
-      saltPath: '/tmp/fuego-test-salt-2.json',
-      logsPath: '/tmp/fuego-test-logs-2',
-      sessionTimeout: 100  // 100ms for testing
+      configPath: path.join(TEST_DIR, 'config.json'),
+      walletPath: TEST_WALLET_PATH,
+      logsPath: path.join(TEST_DIR, 'logs')
     })
 
-    await wallet.initialize(keypair, password)
-    await wallet.authenticate(password)
+    await wallet.initialize(testKeypair, 'devnet')
+    
+    expect(wallet.getAddress()).toBe(testKeypair.publicKey.toString())
+    expect(fs.existsSync(TEST_WALLET_PATH)).toBe(true)
+  })
 
-    // Wait for session to expire
-    await new Promise(resolve => setTimeout(resolve, 150))
+  test('FuegoWallet loads and signs instantly', async () => {
+    const wallet = new FuegoWallet({
+      configPath: path.join(TEST_DIR, 'config.json'),
+      walletPath: TEST_WALLET_PATH,
+      logsPath: path.join(TEST_DIR, 'logs')
+    })
 
-    // Should fail because session expired
-    expect(() => {
-      wallet.signData(Buffer.from('test'))
-    }).toThrow('Session expired')
+    await wallet.initialize(testKeypair)
+    
+    // Load wallet
+    await wallet.load()
+    
+    // Sign data instantly - no password prompts!
+    const testData = Buffer.from('test message')
+    const signature = wallet.signData(testData)
+    
+    expect(signature).toBeInstanceOf(Buffer)
+    expect(signature.length).toBeGreaterThan(0)
+  })
+
+  test('getKeypair works without explicit load call', async () => {
+    const wallet = new FuegoWallet({
+      configPath: path.join(TEST_DIR, 'config.json'),
+      walletPath: TEST_WALLET_PATH,
+      logsPath: path.join(TEST_DIR, 'logs')
+    })
+
+    await wallet.initialize(testKeypair)
+    
+    // Get keypair without calling load() - should auto-load
+    const keypair = wallet.getKeypair()
+    
+    expect(keypair.publicKey.toString()).toBe(testKeypair.publicKey.toString())
+    expect(keypair.secretKey).toEqual(testKeypair.secretKey)
   })
 })

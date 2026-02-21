@@ -1,0 +1,128 @@
+/* Fuego Dashboard Themes */
+
+/* Light Theme - Default */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-tertiary: #eef0f3;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b7280;
+    --border-color: #e5e7eb;
+    --accent-primary: #667eea;
+    --accent-secondary: #764ba2;
+    --accent-success: #10b981;
+    --accent-warning: #f59e0b;
+    --accent-error: #ef4444;
+}
+
+/* Dark Theme */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #0f1419;
+        --bg-secondary: #1a202c;
+        --bg-tertiary: #2d3748;
+        --text-primary: #f5f7fa;
+        --text-secondary: #a0aec0;
+        --border-color: #2d3748;
+        --accent-primary: #8b5cf6;
+        --accent-secondary: #a78bfa;
+        --accent-success: #10b981;
+        --accent-warning: #f59e0b;
+        --accent-error: #ef4444;
+    }
+}
+
+/* === OFFICIAL FUEGO COLOR THEMES === */
+
+/* Fuego Flame (Hot) - Main Brand Theme */
+/* Dark theme with golden accents, inspired by lobster.cash aesthetic */
+[data-theme="flame"] {
+    --bg-primary: #1a1a1a;        /* Dark charcoal */
+    --bg-secondary: #242424;      /* Slightly lighter charcoal */
+    --bg-tertiary: #2d2d2d;       /* Even lighter for hover states */
+    --text-primary: #f5f5f5;      /* Off-white for readability */
+    --text-secondary: #a8a8a8;    /* Muted gray text */
+    --border-color: #333333;      /* Dark borders */
+    --accent-primary: #fbbf24;    /* Golden amber (like send button) */
+    --accent-secondary: #f59e0b;  /* Warm orange */
+    --accent-success: #fbbf24;    /* Golden accent */
+}
+
+/* Fuego Electric (Cool) - Modern Tech */
+[data-theme="electric"] {
+    --accent-primary: #667eea;    /* Purple */
+    --accent-secondary: #764ba2;  /* Deep purple */
+    --accent-success: #10b981;    /* Teal green */
+}
+
+/* Fuego Midnight (Professional) */
+[data-theme="midnight"] {
+    --accent-primary: #3b82f6;    /* Blue */
+    --accent-secondary: #1e40af;  /* Dark blue */
+    --accent-success: #06b6d4;    /* Cyan */
+}
+
+/* Fuego Solar (Energetic) */
+[data-theme="solar"] {
+    --accent-primary: #fbbf24;    /* Amber */
+    --accent-secondary: #f59e0b;  /* Orange */
+    --accent-success: #10b981;    /* Green */
+}
+
+/* Token Colors (Universal) */
+.dot-sol {
+    background: #14f195 !important;  /* Solana Green */
+}
+
+.dot-usdc {
+    background: #2a52be !important;  /* Blue */
+}
+
+.dot-usdt {
+    background: #26a17b !important;  /* Teal */
+}
+
+/* Theme Toggle Utilities */
+.theme-switcher {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.theme-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.theme-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+.theme-btn.active {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .theme-switcher {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .theme-btn {
+        flex: 0 1 calc(50% - 3px);
+    }
+}

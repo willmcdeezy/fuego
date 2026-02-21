@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Fuego Agent Transaction Signer
+Fuego Agent Transaction Signer - AGENT-READY EDITION (No Passwords!)
 
-Sign and submit USDC/SOL transfers using FuegoWallet.
+Sign and submit USDC/SOL/USDT transfers using simple JSON wallet.
 - Server builds unsigned tx
-- Agent signs with encrypted wallet
+- Agent signs with simple wallet file  
 - Agent submits signed tx
 
 Usage:
@@ -23,7 +23,6 @@ import sys
 import base64
 import requests
 from pathlib import Path
-from getpass import getpass
 
 # Try to import solders (agent signing library)
 try:
@@ -36,52 +35,36 @@ except ImportError:
     print("Install with: pip install solders")
     sys.exit(1)
 
-# Wallet encryption/decryption (simplified - in production use proper crypto)
-class SimpleWallet:
-    """Minimal wallet implementation for this script"""
-    
-    def __init__(self, keypair_bytes: bytes, password: str):
-        self.keypair = Keypair.from_secret_key(keypair_bytes)
-        self.password = password  # Not actually used here, just for symmetry
-    
-    @staticmethod
-    def load(wallet_path: str, password: str) -> "SimpleWallet":
-        """Load wallet from ~/.fuego/wallet.json"""
-        wallet_path = Path(wallet_path).expanduser()
-        
-        if not wallet_path.exists():
-            raise FileNotFoundError(f"Wallet not found at {wallet_path}")
-        
-        with open(wallet_path, 'r') as f:
-            wallet_data = json.load(f)
-        
-        # In production, decrypt with password + Argon2
-        # For now, this is a placeholder
-        # The actual FuegoWallet is TypeScript: src/wallet.ts
-        
-        if 'keypair' in wallet_data:
-            # Assume keypair is base58 encoded or similar
-            # This is where FuegoWallet decryption happens
-            raise NotImplementedError(
-                "Wallet decryption requires the TypeScript FuegoWallet\n"
-                "For now, use environment variable: FUEGO_KEYPAIR_BASE58"
-            )
-        
-        raise ValueError("Invalid wallet format")
 
-
-def load_wallet_from_env() -> Keypair:
-    """Load keypair from environment variable (test/demo only)"""
-    keypair_b58 = os.getenv("FUEGO_KEYPAIR_BASE58")
-    if not keypair_b58:
-        raise ValueError(
-            "No wallet loaded. Set FUEGO_KEYPAIR_BASE58 or use FuegoWallet init.\n"
-            "Example: export FUEGO_KEYPAIR_BASE58='...'  # base58 secret key"
-        )
+def load_wallet_from_file(wallet_path: str) -> Keypair:
+    """Load keypair from simple JSON wallet file (no password required!)"""
+    wallet_path = Path(wallet_path).expanduser()
     
-    from base58 import b58decode
-    keypair_bytes = b58decode(keypair_b58)
-    return Keypair.from_secret_key(keypair_bytes)
+    if not wallet_path.exists():
+        raise FileNotFoundError(f"Wallet not found at {wallet_path}")
+    
+    with open(wallet_path, 'r') as f:
+        wallet_data = json.load(f)
+    
+    # Handle both formats:
+    # 1. Fuego format: {"privateKey": [1,2,3...64], "address": "...", "network": "..."}  
+    # 2. Solana CLI format: [1,2,3,4...64] (raw array)
+    
+    if isinstance(wallet_data, list):
+        # Solana CLI format: raw array
+        if len(wallet_data) != 64:
+            raise ValueError(f"Invalid Solana CLI wallet: expected 64 bytes, got {len(wallet_data)}")
+        keypair_bytes = bytes(wallet_data)
+    elif isinstance(wallet_data, dict) and 'privateKey' in wallet_data:
+        # Fuego format: JSON object with privateKey field
+        private_key = wallet_data['privateKey']
+        if len(private_key) != 64:
+            raise ValueError(f"Invalid Fuego wallet: expected 64 bytes, got {len(private_key)}")
+        keypair_bytes = bytes(private_key)
+    else:
+        raise ValueError("Invalid wallet format. Expected Fuego JSON or Solana CLI array format.")
+    
+    return Keypair.from_bytes(keypair_bytes)
 
 
 def build_transfer(server_url: str, network: str, from_addr: str, to_addr: str, 
@@ -108,8 +91,9 @@ def build_transfer(server_url: str, network: str, from_addr: str, to_addr: str,
     return result["data"]
 
 
-def sign_transaction(tx_base64: str, keypair: Keypair) -> str:
+def sign_transaction(tx_base64: str, keypair: Keypair, blockhash_str: str) -> str:
     """Deserialize, sign, and return signed transaction"""
+    from solders.hash import Hash
     
     # Decode from server's base64
     tx_bytes = base64.b64decode(tx_base64)
@@ -117,8 +101,11 @@ def sign_transaction(tx_base64: str, keypair: Keypair) -> str:
     # Deserialize into Transaction object
     tx = Transaction.from_bytes(tx_bytes)
     
-    # Sign with agent's keypair (blockhash already in message)
-    tx.sign([keypair], None)  # None = use msg's blockhash
+    # Convert blockhash string to Hash object
+    blockhash = Hash.from_string(blockhash_str)
+    
+    # Sign with agent's keypair (modifies tx in-place)
+    tx.sign([keypair], blockhash)
     
     # Serialize and re-encode for submission
     signed_bytes = bytes(tx)
@@ -147,7 +134,7 @@ def submit_transaction(server_url: str, network: str, signed_tx_b64: str) -> dic
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sign and submit Solana transactions with FuegoWallet"
+        description="Sign and submit Solana transactions with Fuego (NO PASSWORDS!)"
     )
     parser.add_argument("--from", dest="from_addr", required=True,
                        help="Source wallet address")
@@ -155,7 +142,7 @@ def main():
                        help="Destination wallet address")
     parser.add_argument("--amount", required=True,
                        help="Transfer amount (in token units)")
-    parser.add_argument("--token", choices=["USDC", "SOL"], default="USDC",
+    parser.add_argument("--token", choices=["USDC", "SOL", "USDT"], default="USDC",
                        help="Token type (default: USDC)")
     parser.add_argument("--network", default="mainnet-beta",
                        help="Solana network (default: mainnet-beta)")
@@ -163,36 +150,24 @@ def main():
                        help="Fuego server URL (default: localhost:8080)")
     parser.add_argument("--wallet", default="~/.fuego/wallet.json",
                        help="Wallet file path (default: ~/.fuego/wallet.json)")
-    parser.add_argument("--keypair", 
-                       help="Agent keypair (base58) - for testing only")
     
     args = parser.parse_args()
     
-    print(f"🔥 Fuego Agent Transaction Signer")
+    print(f"🔥 Fuego Agent Transaction Signer - Agent-Ready Edition")
     print(f"Network: {args.network}")
     print(f"From: {args.from_addr}")
     print(f"To: {args.to}")
     print(f"Amount: {args.amount} {args.token}")
     print()
     
-    # Load keypair
+    # Load keypair from simple JSON file - NO PASSWORD REQUIRED!
     try:
-        if args.keypair:
-            # Test mode: use provided keypair
-            from base58 import b58decode
-            keypair_bytes = b58decode(args.keypair)
-            keypair = Keypair.from_secret_key(keypair_bytes)
-            print("✅ Loaded keypair from --keypair")
-        else:
-            # Production mode: prompt for wallet password
-            print("Loading FuegoWallet...")
-            password = getpass("Wallet password: ")
-            # This would call FuegoWallet.load() in TypeScript
-            # For now, try env variable fallback
-            keypair = load_wallet_from_env()
-            print("✅ Loaded keypair from environment")
+        print(f"📂 Loading wallet from {args.wallet}...")
+        keypair = load_wallet_from_file(args.wallet)
+        print("✅ Wallet loaded successfully")
     except Exception as e:
         print(f"❌ Failed to load wallet: {e}")
+        print(f"\n💡 Tip: Initialize wallet with: cd src/cli && node init.ts")
         sys.exit(1)
     
     print()
@@ -210,10 +185,14 @@ def main():
         print(f"   Memo: {build_result['memo']}")
         print()
         
-        # Step 2: Sign with agent's keypair
-        print("🔐 Signing transaction with FuegoWallet...")
-        signed_tx_b64 = sign_transaction(build_result['transaction'], keypair)
-        print(f"✅ Transaction signed")
+        # Step 2: Sign with agent's keypair - INSTANT, NO PROMPTS!
+        print("🔐 Signing transaction (no password required)...")
+        signed_tx_b64 = sign_transaction(
+            build_result['transaction'], 
+            keypair, 
+            build_result['blockhash']
+        )
+        print(f"✅ Transaction signed instantly")
         print()
         
         # Step 3: Submit to server for broadcast
@@ -235,11 +214,11 @@ def main():
         print(f"Explorer:  {link}")
         print("=" * 70)
         print()
-        print("🎉 Transaction on-chain! Verify with the explorer link above.")
+        print("🎉 Transaction on-chain! Agent-ready speed achieved! 🔮")
         
     except requests.exceptions.ConnectionError:
         print(f"❌ Failed to connect to Fuego server at {args.server}")
-        print("   Is the server running? Start with: ./fuego-server")
+        print("   Is the server running? Start with: ./server/target/release/fuego-server")
         sys.exit(1)
     except Exception as e:
         print(f"❌ Error: {e}")
