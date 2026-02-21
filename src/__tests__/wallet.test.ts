@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from '@jest/globals'
 import fs from 'fs'
 import path from 'path'
 import { Keypair } from '@solana/web3.js'
-import { FuegoWallet, saveWalletToFile, loadWalletFromFile } from '../index'
+import { FuegoWallet, saveWalletToFile, loadWalletFromFile } from '../index.js'
 
 const TEST_DIR = '/tmp/fuego-test'
 const TEST_WALLET_PATH = path.join(TEST_DIR, 'test-wallet.json')

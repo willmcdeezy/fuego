@@ -6,7 +6,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Keypair } from '@solana/web3.js'
-import { FuegoWallet } from '../index'
+import { FuegoWallet } from '../index.js'
 
 async function main() {
   console.log('🔥 Fuego Wallet Init - Agent-Ready Edition\n')
