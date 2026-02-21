@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "npx tsc",
     "test": "jest", 
     "dev": "ts-node src/index.ts",
     "init": "node dist/cli/init.js",
