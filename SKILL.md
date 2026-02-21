@@ -106,7 +106,7 @@ start dashboard/dashboard.html   # Windows
 
 **Dashboard Features:**
 - 💰 **Real-time balances** (SOL, USDC, USDT) with USD values
-- 📊 **Transaction history** - Fuego transactions + All transactions  
+- 📊 **Transaction history** - All transactions with Fuego-styled entries  
 - 🔄 **One-click refresh** - No page reloads needed
 - 🌓 **Dark/Light themes** - Automatic system detection
 - 🔗 **Explorer links** - Direct to Solana Explorer
@@ -336,20 +336,7 @@ curl -X POST http://127.0.0.1:8080/submit-transaction \\
 
 ### History Endpoints
 
-#### POST /transaction-history - Get Fuego Transactions (Filtered)
-```bash
-curl -X POST http://127.0.0.1:8080/transaction-history \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "network": "mainnet-beta",
-    "address": "YOUR_ADDRESS", 
-    "limit": 10
-  }'
-```
-
-Returns transactions with Fuego memo format (parsed by dashboard).
-
-#### POST /all-transactions - Get All Transactions (Unfiltered)  
+#### POST /all-transactions - Get All Transactions
 ```bash
 curl -X POST http://127.0.0.1:8080/all-transactions \\
   -H "Content-Type: application/json" \\
@@ -360,7 +347,7 @@ curl -X POST http://127.0.0.1:8080/all-transactions \\
   }'
 ```
 
-Returns all wallet transactions (signature + timestamp only).
+Returns all wallet transactions. Fuego transactions (those with `fuego|` in the memo) are styled with rich details (token icon, amount, from/to, 🔥 Sent/Received badge) in the dashboard. Regular transactions show simplified styling.
 
 ---
 
@@ -470,6 +457,99 @@ else:
 ### 🛠️ Alternative: Raw API Integration (Not Recommended)
 
 *If you absolutely must use raw API calls instead of the superior Python script:*
+
+---
+
+### 🔄 Jupiter x402 Swap Integration (DEX Swaps)
+
+**For agents that need to perform DEX swaps via Jupiter + x402 payment protocol:**
+
+The `x402_jupiter_fresh_blockhash.mjs` script provides a complete pipeline for executing Jupiter swaps with automatic x402 payment handling, fresh blockhash replacement, and local signing.
+
+```bash
+# Default: Swap 0.02 SOL → USDC
+node scripts/x402_jupiter_fresh_blockhash.mjs
+
+# Swap 1 USDC → SOL
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --input USDC --output SOL --amount 1000000
+
+# Swap SOL → BONK with custom slippage
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --output BONK --amount 100000000 --slippage 100
+
+# Use raw mint addresses
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --input So11111111111111111111111111111111111111112 \
+  --output EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+  --amount 50000000
+```
+
+**CLI Arguments:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--input` | `SOL` | Input token (symbol or mint address) |
+| `--output` | `USDC` | Output token (symbol or mint address) |
+| `--amount` | `20000000` | Amount in lamports/smallest unit |
+| `--slippage` | `50` | Slippage tolerance in basis points (0.5%) |
+
+**Supported Token Symbols:**
+- `SOL`, `USDC`, `USDT`, `BONK`, `JUP`, `WIF`
+- Or use raw mint addresses for any SPL token
+
+**Pipeline Flow:**
+```
+1. Call Jupiter API via x402_faremeter.ts
+   ↓ (x402 payment handled automatically by @faremeter/rides)
+2. Extract transaction from Jupiter response
+   ↓
+3. Get fresh blockhash from Fuego server
+   ↓
+4. Deserialize, replace blockhash, re-sign locally
+   ↓
+5. Submit to /submit-versioned-transaction endpoint
+   ↓
+✅ Swap complete with on-chain signature
+```
+
+**Agent Integration Example:**
+```python
+import subprocess
+
+class FuegoSwapAgent:
+    def jupiter_swap(self, input_token, output_token, amount_lamports, slippage_bps=50):
+        """Execute Jupiter swap via x402 + fresh blockhash pipeline"""
+        result = subprocess.run([
+            'node', 'scripts/x402_jupiter_fresh_blockhash.mjs',
+            '--input', input_token,
+            '--output', output_token,
+            '--amount', str(amount_lamports),
+            '--slippage', str(slippage_bps)
+        ], capture_output=True, text=True, cwd='/path/to/fuego')
+        
+        if 'PIPELINE COMPLETE' in result.stdout:
+            # Extract signature from output
+            for line in result.stdout.split('\n'):
+                if 'Final signature:' in line:
+                    signature = line.split(': ')[1].strip()
+                    return {
+                        'success': True,
+                        'signature': signature,
+                        'explorer': f'https://explorer.solana.com/tx/{signature}?cluster=mainnet-beta'
+                    }
+        return {'success': False, 'error': result.stderr or result.stdout}
+
+# Usage
+agent = FuegoSwapAgent()
+result = agent.jupiter_swap('SOL', 'USDC', 20000000, 50)
+if result['success']:
+    print(f"✅ Swap complete: {result['signature']}")
+```
+
+**When to use this vs sign_and_submit.py:**
+- Use `sign_and_submit.py` for: Direct transfers (SOL, USDC, USDT)
+- Use `x402_jupiter_fresh_blockhash.mjs` for: DEX swaps via Jupiter with x402 payment
 
 ---
 
