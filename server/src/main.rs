@@ -13,8 +13,6 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::message::Message;
 use solana_sdk::transaction::{Transaction, VersionedTransaction};
-use solana_sdk::signer::Signer;
-use std::str::FromStr;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::instruction as token_instruction;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
@@ -25,8 +23,6 @@ use utils::string_to_pub_key;
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::fs;
-use std::path::Path;
-use reqwest;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -125,6 +121,7 @@ struct GetAccountSignatures {
 }
 
 // x402 Request/Response structs
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct X402Request {
     url: String,
@@ -136,10 +133,12 @@ struct X402Request {
     body: Option<serde_json::Value>,
 }
 
+#[allow(dead_code)]
 fn default_method() -> String {
     "GET".to_string()
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct X402PaymentRequirement {
     asset: String,
@@ -152,6 +151,7 @@ struct X402PaymentRequirement {
     extra: X402Extra,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct X402Extra {
     // Use Option for parsing, but require for Solana logic
@@ -179,6 +179,7 @@ struct X402Extra {
     verifying_contract: Option<serde_json::Value>,
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct X402Response {
     #[serde(rename = "x402Version")]
