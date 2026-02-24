@@ -963,26 +963,4 @@ lazy_static! {
 
 ---
 
-## 🔮 Roadmap & Future Features
-
-### v0.2.0 - Enhanced Agent Features
-- 🔄 **CLI tool** - `fuego balance`, `fuego send` commands
-- 📊 **Batch transactions** - Multiple transfers in one call
-- 🔍 **Enhanced history API** - Full transaction parsing
-- 📈 **Performance metrics** - Transaction timing/success rates
-
-### v0.3.0 - Advanced Integration  
-- 🔌 **Hardware wallet support** - Ledger, Trezor integration
-- 🌐 **Multi-network** - Ethereum, Polygon bridge support
-- 🤖 **Agent SDK** - High-level libraries for popular frameworks
-- 📡 **Webhooks** - Real-time transaction notifications
-
-### v1.0.0 - Production Suite
-- 🏭 **Enterprise features** - Multi-tenant, audit logging
-- 🔒 **Enhanced security** - MPC, threshold signing
-- ⚡ **Lightning fast** - Sub-100ms transaction building
-- 🌍 **Global deployment** - Multi-region server options
-
----
-
 **🔥 Ready to build autonomous Solana agents? Start with Fuego! 🤖**
