@@ -60,18 +60,10 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 
 ### 1. Install fuego-cli
 ```bash
-# Install the Fuego CLI tool (requires Node.js)
 npm install -g fuego-cli
 ```
 
-### 2. Build Server
-```bash
-# Clone repo and build server
-git clone https://github.com/willmcdeezy/fuego.git
-cd fuego/server && cargo build
-```
-
-### 3. Create Wallet (Password-Free!)
+### 2. Create Wallet (Password-Free!)
 ```bash
 # Create agent-ready wallet (no password required!)
 fuego create
@@ -82,25 +74,53 @@ fuego create
 # 💾 Backup: ~/.config/solana/fuego-backup.json
 ```
 
+### 3. Install Fuego Project
+```bash
+# For OpenClaw agents (auto-detects ~/.openclaw/workspace)
+fuego install
+
+# For manual/Cursor/Claude Code installs (specify path)
+fuego install --path ~/projects/fuego
+```
+
 ### 4. Start Server
 ```bash
-cd server && cargo run
+fuego serve
 
 # Output:
 # 🔥 Fuego server running on http://127.0.0.1:8080
-# Endpoints:
-#   GET  /wallet-address - Get local wallet address  
-#   POST /balance, /usdc-balance, /usdt-balance - Check balances
-#   POST /build-transfer-{sol,usdc,usdt} - Build unsigned transactions
-#   POST /submit-transaction - Broadcast signed transactions
 ```
 
-### 4. View Dashboard
+### 5. Show Address to Human
 ```bash
-# Open dashboard (works in any browser)
-open dashboard/dashboard.html    # macOS
-firefox dashboard/dashboard.html # Linux  
-start dashboard/dashboard.html   # Windows
+fuego address
+
+# Output:
+# 📍 Your Fuego Address
+# Name: default
+# Public Key: DmFy...eUZF
+```
+
+> 💡 **For humans:** Share this address so they can fund the wallet. They can send SOL from any Solana wallet (Phantom, Solflare, etc.).
+
+### 6. Fund the Wallet
+
+**Option A: MoonPay (for fiat → crypto)**
+- Visit: https://buy.moonpay.com/?currency=SOL&address=YOUR_ADDRESS
+- Minimum: ~$30 USD
+- Instant to wallet
+
+**Option B: Manual transfer**
+- Human copies address from above
+- Sends SOL from their wallet to your Fuego address
+- SOL needed for transaction fees (0.001 SOL per tx)
+
+### 7. Open Dashboard (Optional - Human View)
+```bash
+fuego dashboard
+
+# Opens dashboard.html in default browser
+# Shows: balances, transaction history, real-time updates
 ```
 
 **Dashboard Features:**
@@ -110,7 +130,9 @@ start dashboard/dashboard.html   # Windows
 - 🌓 **Dark/Light themes** - Automatic system detection
 - 🔗 **Explorer links** - Direct to Solana Explorer
 
-### 5. Send Instant Transactions - THE AGENT WAY 🤖
+---
+
+## 🐍 Send Transactions - THE AGENT WAY
 
 **⚡ This is THE recommended approach for all autonomous agents:**
 
@@ -712,17 +734,34 @@ fuego/
 - [Python](https://python.org/) (3.8+) - For transaction scripts
 
 ### Building from Source
+
+**Option A: Using fuego-cli (Recommended)**
+```bash
+# 1. Install CLI
+npm install -g fuego-cli
+
+# 2. Clone repository
+git clone https://github.com/willmcdeezy/fuego.git
+cd fuego
+
+# 3. Create wallet
+fuego create
+
+# 4. Start server (auto-builds with cargo)
+fuego serve
+```
+
+**Option B: Manual Build**
 ```bash
 # 1. Clone repository
 git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 
-# 2. Build Rust server
-cd server
-cargo build
+# 2. Build Rust server manually
+cd server && cargo build
 
-# 3. Create wallet (using fuego-cli)
-fuego create
+# 3. Run server
+./target/debug/fuego-server
 ```
 
 ### Customizing for Your Agents
@@ -761,13 +800,12 @@ sudo useradd -m -s /bin/bash fuego-agent
 # 2. Install fuego-cli (requires Node.js)
 sudo -u fuego-agent npm install -g fuego-cli
 
-# 3. Clone and build Fuego server
+# 3. Clone Fuego server
 sudo -u fuego-agent git clone https://github.com/willmcdeezy/fuego.git /home/fuego-agent/fuego
-cd /home/fuego-agent/fuego/server
-sudo -u fuego-agent cargo build
 
-# 4. Create wallet
+# 4. Create wallet and install project
 sudo -u fuego-agent fuego create
+sudo -u fuego-agent fuego install --path /home/fuego-agent/fuego
 
 # 5. Create systemd service
 sudo tee /etc/systemd/system/fuego.service << EOF
@@ -779,9 +817,22 @@ After=network.target
 Type=simple
 User=fuego-agent
 WorkingDirectory=/home/fuego-agent/fuego/server
-ExecStart=/home/fuego-agent/.cargo/bin/cargo run
+ExecStart=/usr/bin/fuego serve
 Restart=always
 RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 6. Start service
+sudo systemctl daemon-reload
+sudo systemctl enable fuego
+sudo systemctl start fuego
+
+# 7. Verify
+curl http://127.0.0.1:8080/wallet-address
+```
 
 [Install]
 WantedBy=multi-user.target
@@ -821,7 +872,7 @@ fuego create
 **Problem: "Server not running" error**  
 ```bash
 # Solution: Start server
-cd server && ./target/release/fuego-server
+fuego serve
 ```
 
 **Problem: "Connection refused" error**
@@ -830,7 +881,13 @@ cd server && ./target/release/fuego-server
 curl http://127.0.0.1:8080/health
 
 # If not running, start it
-cd server && ./target/release/fuego-server
+fuego serve
+```
+
+**Problem: "Fuego server not found" error**
+```bash
+# Solution: Install the fuego project
+fuego install
 ```
 
 **Problem: "Transaction simulation failed" error**
