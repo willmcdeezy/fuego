@@ -8,7 +8,7 @@ metadata:
       {
         "emoji": "🔥",
         "requires": { "bins": ["curl"], "env": [] },
-        "optional": { "bins": ["python3", "node", "npm"] },
+        "optional": { "bins": ["python3"] },
       },
   }
 ---
@@ -58,32 +58,34 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 
 ## 🚀 Quick Start (5 Minutes)
 
-### 1. Install & Build
+### 1. Install fuego-cli
 ```bash
-# Clone repo
-git clone https://github.com/willmcdeezy/fuego.git
-cd fuego
+# Install the Fuego CLI tool
+curl -fsSL https://fuego.cash/install.sh | sh
 
-# Install dependencies and build
-npm install
-npm run build
-
-# Build server
-cd server && cargo build --release
+# Or with cargo:
+cargo install fuego-cli
 ```
 
-### 2. Initialize Wallet (Password-Free!)
+### 2. Build Server
+```bash
+# Clone repo and build server
+git clone https://github.com/willmcdeezy/fuego.git
+cd fuego/server && cargo build --release
+```
+
+### 3. Create Wallet (Password-Free!)
 ```bash
 # Create agent-ready wallet (no password required!)
-npm run init
+fuego create
 
 # Output:
 # ✅ Address: DmFyLRiJtc4Bz75hjAqPaEJpDfRe4GEnRLPwc3EgeUZF
-# 📁 Wallet: ~/.fuego/wallet.json (simple JSON format)
+# 📁 Wallet config: ~/.fuego/wallet-config.json
 # 💾 Backup: ~/.config/solana/fuego-backup.json
 ```
 
-### 3. Start Server
+### 4. Start Server
 ```bash
 cd server && ./target/release/fuego-server
 
@@ -684,19 +686,10 @@ fuego/
 ├── ROADMAP.md         # Future plans
 ├── COLORS.md          # Brand colors & design system
 ├── SETUP_UX.md        # Setup UX documentation
-├── package.json       # Node.js dependencies
-├── tsconfig.json      # TypeScript configuration
 ├── src/               # TypeScript source code
 │   ├── index.ts       # Main wallet library
 │   ├── types.ts       # Type definitions
-│   ├── crypto.ts      # Wallet utilities
-│   ├── cli/
-│   │   └── init.ts    # Wallet initialization script
-│   └── __tests__/
-│       └── wallet.test.ts  # Test files
-├── dist/              # Compiled JavaScript (generated)
-│   ├── cli/           # Compiled CLI scripts
-│   └── __tests__/     # Compiled tests
+│   └── crypto.ts      # Wallet utilities
 ├── scripts/           # Agent-ready transaction scripts
 │   ├── sign_and_submit.py           # Python transaction tool
 │   ├── x402_faremeter.ts            # x402 payment handler
@@ -717,8 +710,8 @@ fuego/
 ```
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (1.85+) - **Required for macOS compatibility**
-- [Node.js](https://nodejs.org/) (18+) - For wallet initialization  
+- [fuego-cli](https://fuego.cash) - Wallet creation and management
+- [Rust](https://rustup.rs/) (1.85+) - **Required for server**
 - [Python](https://python.org/) (3.8+) - For transaction scripts
 
 ### Building from Source
@@ -727,20 +720,13 @@ fuego/
 git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 
-# 2. Install Node.js dependencies  
-npm install
-
-# 3. Build TypeScript
-npm run build
-
-# 4. Build Rust server
+# 2. Build Rust server
 cd server
 cargo build --release
 # Binary: target/release/fuego-server
 
-# 5. Run tests
-cd ..
-npm test
+# 3. Create wallet (using fuego-cli)
+fuego create
 ```
 
 ### Customizing for Your Agents
@@ -776,17 +762,18 @@ const PYUSD_MINT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
 # 1. Create dedicated agent user
 sudo useradd -m -s /bin/bash fuego-agent
 
-# 2. Install Fuego
+# 2. Install fuego-cli
+sudo -u fuego-agent curl -fsSL https://fuego.cash/install.sh | sh
+
+# 3. Clone and build Fuego server
 sudo -u fuego-agent git clone https://github.com/willmcdeezy/fuego.git /home/fuego-agent/fuego
-cd /home/fuego-agent/fuego
-sudo -u fuego-agent npm install
-sudo -u fuego-agent npm run build
-cd server && sudo -u fuego-agent cargo build --release
+cd /home/fuego-agent/fuego/server
+sudo -u fuego-agent cargo build --release
 
-# 3. Initialize wallet
-sudo -u fuego-agent npm run init
+# 4. Create wallet
+sudo -u fuego-agent fuego create
 
-# 4. Create systemd service
+# 5. Create systemd service
 sudo tee /etc/systemd/system/fuego.service << EOF
 [Unit]
 Description=Fuego Solana Wallet Server
@@ -804,12 +791,12 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-# 5. Start service
+# 6. Start service
 sudo systemctl daemon-reload
 sudo systemctl enable fuego
 sudo systemctl start fuego
 
-# 6. Verify
+# 7. Verify
 curl http://127.0.0.1:8080/wallet-address
 ```
 
@@ -831,8 +818,8 @@ curl http://127.0.0.1:8080/wallet-address
 
 **Problem: "Wallet not initialized" error**
 ```bash
-# Solution: Initialize wallet
-npm run init
+# Solution: Create wallet with fuego-cli
+fuego create
 ```
 
 **Problem: "Server not running" error**  
