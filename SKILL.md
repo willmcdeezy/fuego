@@ -702,13 +702,7 @@ def handle_deposit_request(self):
 fuego/
 ├── README.md           # Main documentation
 ├── SKILL.md           # This file (agent integration guide)
-├── ROADMAP.md         # Future plans
-├── COLORS.md          # Brand colors & design system
-├── SETUP_UX.md        # Setup UX documentation
-├── src/               # TypeScript source code
-│   ├── index.ts       # Main wallet library
-│   ├── types.ts       # Type definitions
-│   └── crypto.ts      # Wallet utilities
+├── package.json       # Minimal dependencies for x402 scripts
 ├── scripts/           # Agent-ready transaction scripts
 │   ├── sign_and_submit.py           # Python transaction tool
 │   ├── x402_faremeter.ts            # x402 payment handler
