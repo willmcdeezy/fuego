@@ -19,49 +19,35 @@
 
 ## 🚀 Quick Start (5 minutes)
 
-### 1. Clone & Build
+### Recommended: Ask Your Agent
 ```bash
-git clone https://github.com/willmcdeezy/fuego.git
-cd fuego
-npm install
-npm run build
+curl -S https://fuego.cash/skill.md | less
 ```
 
-### 2. Build Server
+**What your agent will do:**
+- Install the `fuego-cli` tool
+- Use the CLI to install this repo
+- Create a wallet using `fuego-cli`
+- Use the Rust server and scripts to query the blockchain, build transactions, and submit transactions to Solana
+
+The `fuego-cli` gives your agent an easy-to-use, agent-friendly tool to handle these flows with speed and ease.
+
+---
+
+### Manual Install
+
 ```bash
-cd server && cargo build --release
+# 1. Install the CLI
+npm install -g fuego-cli
+
+# 2. Install this repo
+fuego install
+
+# 3. Create a wallet at ~/.fuego
+fuego create
 ```
 
-### 3. Initialize Wallet (Agent-Ready!)
-```bash
-npm run init
-# ✅ Wallet created at ~/.fuego/wallet.json
-# 📁 Backup saved to ~/.config/solana/fuego-backup.json
-# 🚀 No passwords required - ready for agents!
-```
-
-### 4. Start Server
-```bash
-cd server && ./target/release/fuego-server
-# 🔥 Fuego server running on http://127.0.0.1:8080
-```
-
-### 5. View Dashboard
-Open `dashboard/dashboard.html` in your browser to see:
-- ✅ Real-time balances (SOL, USDC, USDT)  
-- 📊 Transaction history (Fuego + All transactions)
-- 🔄 One-click refresh
-- 🎨 Dark/light theme toggle
-
-### 6. Send Transactions (Instant!)
-```bash
-# Agent-ready transaction signing (no password prompts)
-python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.001 --token SOL
-
-# 📂 Loading wallet... ✅ Wallet loaded successfully  
-# 🔐 Signing transaction (no password required)... ✅ Transaction signed instantly
-# 🎉 Transaction on-chain! Agent-ready speed achieved! 🔮
-```
+Your agent is now ready to query balances, build transactions, and submit to the blockchain!
 
 ---
 
