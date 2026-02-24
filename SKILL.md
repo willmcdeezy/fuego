@@ -8,7 +8,7 @@ metadata:
       {
         "emoji": "🔥",
         "requires": { "bins": ["curl"], "env": [] },
-        "optional": { "bins": ["python3"] },
+        "optional": { "bins": ["python3", "node"], "env": [] },
       },
   }
 ---
@@ -60,18 +60,15 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 
 ### 1. Install fuego-cli
 ```bash
-# Install the Fuego CLI tool
-curl -fsSL https://fuego.cash/install.sh | sh
-
-# Or with cargo:
-cargo install fuego-cli
+# Install the Fuego CLI tool (requires Node.js)
+npm install -g fuego-cli
 ```
 
 ### 2. Build Server
 ```bash
 # Clone repo and build server
 git clone https://github.com/willmcdeezy/fuego.git
-cd fuego/server && cargo build --release
+cd fuego/server && cargo build
 ```
 
 ### 3. Create Wallet (Password-Free!)
@@ -87,7 +84,7 @@ fuego create
 
 ### 4. Start Server
 ```bash
-cd server && ./target/release/fuego-server
+cd server && cargo run
 
 # Output:
 # 🔥 Fuego server running on http://127.0.0.1:8080
@@ -710,7 +707,7 @@ fuego/
 ```
 
 ### Prerequisites
-- [fuego-cli](https://fuego.cash) - Wallet creation and management
+- [fuego-cli](https://www.npmjs.com/package/fuego-cli) - Wallet creation and management (requires Node.js)
 - [Rust](https://rustup.rs/) (1.85+) - **Required for server**
 - [Python](https://python.org/) (3.8+) - For transaction scripts
 
@@ -722,8 +719,7 @@ cd fuego
 
 # 2. Build Rust server
 cd server
-cargo build --release
-# Binary: target/release/fuego-server
+cargo build
 
 # 3. Create wallet (using fuego-cli)
 fuego create
@@ -762,13 +758,13 @@ const PYUSD_MINT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
 # 1. Create dedicated agent user
 sudo useradd -m -s /bin/bash fuego-agent
 
-# 2. Install fuego-cli
-sudo -u fuego-agent curl -fsSL https://fuego.cash/install.sh | sh
+# 2. Install fuego-cli (requires Node.js)
+sudo -u fuego-agent npm install -g fuego-cli
 
 # 3. Clone and build Fuego server
 sudo -u fuego-agent git clone https://github.com/willmcdeezy/fuego.git /home/fuego-agent/fuego
 cd /home/fuego-agent/fuego/server
-sudo -u fuego-agent cargo build --release
+sudo -u fuego-agent cargo build
 
 # 4. Create wallet
 sudo -u fuego-agent fuego create
@@ -783,7 +779,7 @@ After=network.target
 Type=simple
 User=fuego-agent
 WorkingDirectory=/home/fuego-agent/fuego/server
-ExecStart=/home/fuego-agent/fuego/server/target/release/fuego-server
+ExecStart=/home/fuego-agent/.cargo/bin/cargo run
 Restart=always
 RestartSec=10
 
