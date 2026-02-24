@@ -25,7 +25,7 @@ curl -S https://fuego.cash/skill.md | less
 ```
 
 **What your agent will do:**
-- Install the `fuego-cli` tool
+- Install the [`fuego-cli`](https://www.npmjs.com/package/fuego-cli) tool
 - Use the CLI to install this repo
 - Create a wallet using `fuego-cli`
 - Use the Rust server and scripts to query the blockchain, build transactions, and submit transactions to Solana
