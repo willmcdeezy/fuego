@@ -1032,7 +1032,7 @@ async fn get_wallet_address() -> Response {
     // No wallet found
     Json(json!({
         "success": false,
-        "error": "No wallet found. Initialize with: fuego init"
+        "error": "No wallet found. Initialize with: fuego create"
     })).into_response()
 }
 
