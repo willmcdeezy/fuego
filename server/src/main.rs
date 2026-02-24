@@ -975,11 +975,11 @@ async fn get_all_transactions(
 
 
 async fn get_wallet_address() -> Response {
-    // Try to load wallet address from ~/.fuego/config.json or ~/.fuego/wallet.json
+    // Try to load wallet address from ~/.fuego/wallet-config.json
     let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
     
-    // Try config.json first (has walletAddress field)
-    let config_path = home_dir.join(".fuego").join("config.json");
+    // Try wallet-config.json first (has walletAddress field)
+    let config_path = home_dir.join(".fuego").join("wallet-config.json");
     if config_path.exists() {
         if let Ok(config_content) = fs::read_to_string(&config_path) {
             if let Ok(config) = serde_json::from_str::<WalletConfig>(&config_content) {
@@ -988,14 +988,14 @@ async fn get_wallet_address() -> Response {
                     "data": {
                         "address": config.wallet_address,
                         "network": config.network,
-                        "source": "config"
+                        "source": "wallet-config"
                     }
                 })).into_response();
             }
         }
     }
     
-    // Fallback to wallet.json (has address field)
+    // Fallback to legacy wallet.json (has address field)
     let wallet_path = home_dir.join(".fuego").join("wallet.json");
     if wallet_path.exists() {
         if let Ok(wallet_content) = fs::read_to_string(&wallet_path) {
@@ -1015,7 +1015,7 @@ async fn get_wallet_address() -> Response {
     // No wallet found
     Json(json!({
         "success": false,
-        "error": "No wallet found. Initialize with: node src/cli/init.ts"
+        "error": "No wallet found. Initialize with: fuego create"
     })).into_response()
 }
 
