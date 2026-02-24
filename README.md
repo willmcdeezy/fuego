@@ -77,10 +77,6 @@ Your agent is now ready to query balances, build transactions, and submit to the
 - 🛠️ Development setup
 - ❗ Troubleshooting guide
 
-**📋 [ROADMAP.md](./ROADMAP.md)** - What's coming next
-
----
-
 ## 🏗️ Agent-Ready Architecture
 
 ```
@@ -263,22 +259,6 @@ Currently, Fuego is battle-tested on mainnet with real transactions, but formal 
 - ✅ **E2E tests** - Full transaction workflows
 
 **Want to contribute tests?** Open an issue or PR on GitHub - all test contributions welcome! 🙏
-
----
-
-## 📋 Status & Roadmap
-
-### ✅ v0.1.0 - Agent-Ready Release
-- Zero-password wallet initialization
-- Multi-token support (SOL, USDC, USDT)
-- Professional dashboard with transaction history
-- REST API with complete documentation  
-- Agent-ready transaction scripts
-
-### ⏳ v0.2.0 - Advanced Features (Planned)
-- CLI tool (`fuego balance`, `fuego send`, etc.)
-- Transaction history API endpoint
-- Node.js server option (faster development - won't need rust but may we will see. May continue building in Rust for security and performance)
 
 ---
 
