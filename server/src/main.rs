@@ -995,23 +995,6 @@ async fn get_wallet_address() -> Response {
         }
     }
     
-    // Fallback to legacy config.json (has walletAddress field)
-    let legacy_config_path = home_dir.join(".fuego").join("config.json");
-    if legacy_config_path.exists() {
-        if let Ok(config_content) = fs::read_to_string(&legacy_config_path) {
-            if let Ok(config) = serde_json::from_str::<WalletConfig>(&config_content) {
-                return Json(json!({
-                    "success": true,
-                    "data": {
-                        "address": config.wallet_address,
-                        "network": config.network,
-                        "source": "config"
-                    }
-                })).into_response();
-            }
-        }
-    }
-    
     // Fallback to legacy wallet.json (has address field)
     let wallet_path = home_dir.join(".fuego").join("wallet.json");
     if wallet_path.exists() {
