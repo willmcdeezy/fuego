@@ -39,7 +39,7 @@ Traditional Solana wallets break agent workflows:
 **If you're an autonomous agent, DO NOT reinvent transaction flows. Use this:**
 
 ```bash
-python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.25 --token USDC
+python3 scripts/fuego_transfer.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.25 --token USDC
 ```
 
 **This single command:**
@@ -138,7 +138,7 @@ fuego dashboard
 
 ```bash
 # Perfect agent workflow - zero interaction, instant execution!
-python3 scripts/sign_and_submit.py \
+python3 scripts/fuego_transfer.py \
   --from YOUR_ADDRESS \
   --to GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5 \
   --amount 0.25 \
@@ -420,7 +420,7 @@ class FuegoAgent:
             self.get_wallet_address()
             
         result = subprocess.run([
-            'python3', 'scripts/sign_and_submit.py',
+            'python3', 'scripts/fuego_transfer.py',
             '--from', self.wallet_address,
             '--to', to_address,
             '--amount', str(amount),
@@ -568,8 +568,8 @@ if result['success']:
     print(f"✅ Swap complete: {result['signature']}")
 ```
 
-**When to use this vs sign_and_submit.py:**
-- Use `sign_and_submit.py` for: Direct transfers (SOL, USDC, USDT)
+**When to use this vs fuego_transfer.py:**
+- Use `fuego_transfer.py` for: Direct transfers (SOL, USDC, USDT)
 - Use `x402_jupiter_fresh_blockhash.mjs` for: DEX swaps via Jupiter with x402 payment
 
 ---
