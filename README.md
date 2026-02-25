@@ -54,13 +54,13 @@ Your agent is now ready to query balances, build transactions, and submit to the
 ## 🤖 Why Agents Love Fuego
 
 ### ❌ Traditional Wallets (Agent Nightmare)
-- 🔒 Password prompts block automation
+- 🔒 Remote server with auth can slow and stall access / performance 
 - ⏱️ Slow multi-step processes  
 - 🌐 Browser extensions don't work headlessly
 - 🔐 Private keys exposed to third parties
 
 ### ✅ Fuego (Agent Paradise) 
-- 🚀 **Zero friction**: No passwords, no prompts, unless you want your agent to build that in
+- 🚀 **Zero friction**: Everything is local! Your agent can customize anything it wants!
 - ⚡ **Instant signing**: Millisecond transaction processing  
 - 🏠 **Local-first**: Keys never leave your machine
 - 📡 **REST API**: Standard HTTP endpoints agents understand

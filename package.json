@@ -1,6 +1,6 @@
 {
   "name": "fuego",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "Local Agentic Solana Wallet - Scripts for x402 payments and Jupiter swaps",
   "type": "module",
   "scripts": {
