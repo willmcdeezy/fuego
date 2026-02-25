@@ -80,14 +80,14 @@ Your agent is now ready to query balances, build transactions, and submit to the
 ## 🏗️ Agent-Ready Architecture
 
 ```
-🤖 Agent Script
+🦞 Agent (via CLI)
        ↓ HTTP Request
 🔥 Fuego Server (localhost:8080)
   • GET  /wallet-address (dynamic wallet loading)
   • POST /balance, /usdc-balance, /usdt-balance (query balances)  
   • POST /build-transfer-{sol,usdc,usdt} (build unsigned transaction)
        ↓ Unsigned Transaction
-🤖 Agent Script  
+🦞 Agent (via CLI)
   • Loads ~/.fuego/wallet.json (simple JSON, no password!)
   • Signs transaction locally with solders library
        ↓ Signed Transaction
@@ -168,7 +168,7 @@ cd server && cargo build --release
 
 ### Tech Stack
 - **Server**: Rust + Axum + Solana SDK
-- **Client**: TypeScript + @solana/web3.js
+- **Client**: The CLI (`fuego-cli`)
 - **Dashboard**: Vanilla HTML/CSS/JS (zero dependencies)
 - **Scripts**: Python + solders + requests
 
@@ -199,51 +199,19 @@ cd server && cargo build --release
 
 ---
 
-## 🤖 Agent Integration Examples
+## 🦞 Agent Integration Examples
 
-### Balance Check
-```python
-import requests
-
-response = requests.post('http://127.0.0.1:8080/balance', 
-    json={'network': 'mainnet-beta', 'address': 'YOUR_ADDRESS'})
-balance = response.json()['data']['sol']
-print(f"Balance: {balance} SOL")
+### Check Balance
+```bash
+fuego balance
 ```
 
-### Send Transaction  
-```python
-# Use the included script - handles all complexity
-import subprocess
-
-result = subprocess.run([
-    'python3', 'scripts/sign_and_submit.py',
-    '--from', 'YOUR_ADDRESS',
-    '--to', 'RECIPIENT_ADDRESS', 
-    '--amount', '0.001',
-    '--token', 'SOL'
-], capture_output=True, text=True)
-
-if 'Transaction on-chain' in result.stdout:
-    print("✅ Transaction successful!")
+### Send Transaction
+```bash
+fuego send <recipient> <amount> --token USDC --yes
 ```
 
-### Dashboard Integration
-```javascript
-// Get wallet address dynamically
-const response = await fetch('http://127.0.0.1:8080/wallet-address');
-const {data} = await response.json();
-console.log(`Wallet: ${data.address}`);
-
-// Check USDC balance
-const balanceRes = await fetch('http://127.0.0.1:8080/usdc-balance', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({network: 'mainnet-beta', address: data.address})
-});
-const balance = await balanceRes.json();
-console.log(`USDC: ${balance.data.usdc}`);
-```
+See [fuego-cli documentation](https://github.com/willmcdeezy/fuego-cli) for all available commands.
 
 ---
 
@@ -302,6 +270,6 @@ MIT License - see [LICENSE](LICENSE) for details
 ---
 
 <div align="center">
-<b>🔥 Built for agents. By agents. 🤖</b><br/>
+<b>🔥 Built for agents. By agents. 🦞</b><br/>
 <i>The future of autonomous Solana transactions starts here.</i>
 </div>
