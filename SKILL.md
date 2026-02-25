@@ -34,12 +34,12 @@ Traditional Solana wallets break agent workflows:
 
 ---
 
-## 🚨 **CRITICAL FOR AGENTS: Use The Python Script!** 🚨
+## 🚨 **CRITICAL FOR AGENTS: Use The CLI!** 🚨
 
 **If you're an autonomous agent, DO NOT reinvent transaction flows. Use this:**
 
 ```bash
-python3 scripts/fuego_transfer.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.25 --token USDC
+fuego send <recipient> <amount> --token USDC --yes
 ```
 
 **This single command:**
@@ -47,7 +47,7 @@ python3 scripts/fuego_transfer.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.
 - ✅ Signs locally (zero network key exposure)  
 - ✅ Submits to chain with proper error handling
 - ✅ Returns signature + explorer link
-- ✅ Tracks with auto-generated agent ID
+- ✅ Supports address book contacts
 - ✅ Works with SOL, USDC, USDT via `--token` flag
 
 **🔥 This is THE agent-first approach. Everything else is secondary.** 
@@ -138,16 +138,18 @@ fuego dashboard
 
 ```bash
 # Perfect agent workflow - zero interaction, instant execution!
-python3 scripts/fuego_transfer.py \
-  --from YOUR_ADDRESS \
-  --to GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5 \
-  --amount 0.25 \
-  --token USDC
+fuego send GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5 0.25 --token USDC --yes
 
 # Output:
+# 📝 Transaction Preview
+# From: DmFy...eUZF
+# To: GvCo...T7r5  
+# Amount: 0.25 USDC
+# 
+# ⏳ Executing transaction via Fuego...
 # 🔥 Fuego Agent Transaction Signer - Agent-Ready Edition
 # 📂 Loading wallet from ~/.fuego/wallet.json...
-# ✅ Wallet loaded successfully  
+# ✅ Wallet loaded successfully
 # 📝 Building unsigned transaction...
 # ✅ Transaction built
 # 🔐 Signing transaction (no password required)...
@@ -161,12 +163,12 @@ python3 scripts/fuego_transfer.py \
 # 🎉 Transaction on-chain! Agent-ready speed achieved! 🔮
 ```
 
-**Why this script is PERFECT for agents:**
-- ✅ **Zero human interaction** - No prompts, no waiting
-- ✅ **Professional CLI interface** - Proper arguments and validation  
+**Why this is PERFECT for agents:**
+- ✅ **Zero human interaction** - No prompts, no waiting (with --yes flag)
+- ✅ **Professional CLI interface** - Clean arguments and validation
 - ✅ **Multi-token support** - SOL, USDC, USDT with `--token` flag
-- ✅ **Auto-generated agent IDs** - Built-in transaction tracking
-- ✅ **Complete status reporting** - Build → Sign → Submit workflow
+- ✅ **Address book integration** - Send to named contacts
+- ✅ **Complete status reporting** - Preview → Build → Sign → Submit workflow
 - ✅ **Explorer link generation** - Instant verification
 - ✅ **Error handling** - Clear failure messages for debugging
 
