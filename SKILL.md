@@ -417,19 +417,19 @@ class FuegoAgent:
         }
     
     def send_payment(self, to_address, amount, token="USDC"):
-        """Send payment using THE professional agent script"""
+        """Send payment using THE professional fuego CLI"""
         if not self.wallet_address:
             self.get_wallet_address()
             
         result = subprocess.run([
-            'python3', 'scripts/fuego_transfer.py',
-            '--from', self.wallet_address,
-            '--to', to_address,
-            '--amount', str(amount),
-            '--token', token
-        ], capture_output=True, text=True, cwd='/path/to/fuego')
+            'fuego', 'send',
+            to_address,
+            str(amount),
+            '--token', token,
+            '--yes'
+        ], capture_output=True, text=True)
         
-        if 'Transaction on-chain! Agent-ready speed achieved!' in result.stdout:
+        if 'Transaction on-chain!' in result.stdout:
             # Extract signature from output
             for line in result.stdout.split('\\n'):
                 if line.startswith('Signature:'):
@@ -570,8 +570,8 @@ if result['success']:
     print(f"✅ Swap complete: {result['signature']}")
 ```
 
-**When to use this vs fuego_transfer.py:**
-- Use `fuego_transfer.py` for: Direct transfers (SOL, USDC, USDT)
+**When to use CLI vs direct API:**
+- Use `fuego send` for: Direct transfers via CLI (recommended)
 - Use `x402_jupiter_fresh_blockhash.mjs` for: DEX swaps via Jupiter with x402 payment
 
 ---
