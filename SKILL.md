@@ -378,106 +378,128 @@ Returns all wallet transactions. Fuego transactions (those with `fuego|` in the 
 
 ---
 
-### 🏆 **THE AGENT-FIRST APPROACH: Python Script Integration**
+### 🏆 **For Agents Writing Code (Python, Node.js, etc.)**
 
-**This is THE way autonomous agents should use Fuego. No other method comes close.**
+**Just call the CLI via subprocess. That's it.**
 
+The CLI handles everything: building, signing, submitting, error handling. Don't wrap it in a class — just use it directly.
+
+**Python:**
 ```python
 import subprocess
-import requests
 
-class FuegoAgent:
-    def __init__(self, server_url="http://127.0.0.1:8080"):
-        self.server_url = server_url
-        self.wallet_address = None
-        
-    def get_wallet_address(self):
-        """Get wallet address dynamically"""
-        response = requests.get(f"{self.server_url}/wallet-address")
-        data = response.json()
-        self.wallet_address = data['data']['address']
-        return self.wallet_address
-    
-    def check_balances(self):
-        """Check all token balances"""
-        if not self.wallet_address:
-            self.get_wallet_address()
-            
-        sol_resp = requests.post(f"{self.server_url}/balance", 
-            json={"network": "mainnet-beta", "address": self.wallet_address})
-        usdc_resp = requests.post(f"{self.server_url}/usdc-balance", 
-            json={"network": "mainnet-beta", "address": self.wallet_address})
-        usdt_resp = requests.post(f"{self.server_url}/usdt-balance", 
-            json={"network": "mainnet-beta", "address": self.wallet_address})
-            
-        return {
-            "SOL": sol_resp.json()['data']['sol'],
-            "USDC": usdc_resp.json()['data'].get('ui_amount', 0),
-            "USDT": usdt_resp.json()['data'].get('ui_amount', 0)
-        }
-    
-    def send_payment(self, to_address, amount, token="USDC"):
-        """Send payment using THE professional fuego CLI"""
-        if not self.wallet_address:
-            self.get_wallet_address()
-            
-        result = subprocess.run([
-            'fuego', 'send',
-            to_address,
-            str(amount),
-            '--token', token,
-            '--yes'
-        ], capture_output=True, text=True)
-        
-        if 'Transaction on-chain!' in result.stdout:
-            # Extract signature from output
-            for line in result.stdout.split('\\n'):
-                if line.startswith('Signature:'):
-                    signature = line.split(': ')[1].strip()
-                    return {
-                        'success': True,
-                        'signature': signature,
-                        'explorer': f'https://explorer.solana.com/tx/{signature}?cluster=mainnet-beta'
-                    }
-        else:
-            return {
-                'success': False, 
-                'error': result.stderr or result.stdout
-            }
+# Check balance
+result = subprocess.run(['fuego', 'balance'], capture_output=True, text=True)
+print(result.stdout)
 
-# Perfect agent usage example
-agent = FuegoAgent()
+# Send payment
+result = subprocess.run([
+    'fuego', 'send',
+    'GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5',
+    '0.25',
+    '--token', 'USDC',
+    '--yes'
+], capture_output=True, text=True)
 
-# Get wallet and balances
-print(f"🔥 Agent wallet: {agent.get_wallet_address()}")
-balances = agent.check_balances()
-print(f"💰 Balances: {balances}")
-
-# Send instant payment (zero friction!)
-result = agent.send_payment("GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5", 0.25, "USDC")
-if result['success']:
-    print(f"✅ Payment sent! {result['signature']}")
-    print(f"🔍 Explorer: {result['explorer']}")
+if 'Transaction on-chain!' in result.stdout:
+    print("✅ Payment sent!")
 else:
-    print(f"❌ Failed: {result['error']}")
+    print(f"❌ Error: {result.stderr}")
 ```
 
-**🚀 Why this approach dominates all alternatives:**
+**Node.js/TypeScript:**
+```javascript
+import { execSync } from 'child_process';
 
-| Feature | Fuego Python Script | Raw API Calls | Other Wallets |
-|---------|-------------------|---------------|---------------|
-| **Zero Interaction** | ✅ Perfect | ❌ Complex signing | ❌ Password prompts |
-| **Professional CLI** | ✅ `--from --to --amount --token` | ❌ Manual JSON | ❌ N/A |
-| **Auto Agent IDs** | ✅ Built-in tracking | ❌ Manual | ❌ No tracking |
-| **Status Reporting** | ✅ Build→Sign→Submit | ❌ Silent failures | ❌ Black box |
-| **Multi-token** | ✅ SOL/USDC/USDT | ❌ Separate endpoints | ❌ Limited |
-| **Error Handling** | ✅ Clear messages | ❌ Raw HTTP errors | ❌ Cryptic failures |
-| **Explorer Links** | ✅ Auto-generated | ❌ Manual construction | ❌ None |
-| **Agent Ready** | ✅ **PERFECT** | ❌ Developer-focused | ❌ Human-focused |
+// Send payment
+const result = execSync(
+  'fuego send GvCo... 0.25 --token USDC --yes',
+  { encoding: 'utf-8' }
+);
+console.log(result);
+```
+
+**Why this is perfect:**
+- ✅ **Zero abstraction** — CLI does everything
+- ✅ **Works in any language** — bash, Python, Node, Go, whatever
+- ✅ **Easy to debug** — run the same command manually
+- ✅ **Always up to date** — CLI updates, your code doesn't change
 
 ---
 
 ### 🛠️ Alternative: Raw API Integration (Not Recommended)
+
+*If you absolutely must use raw API calls instead of the CLI:*
+
+---
+
+### 🔄 Jupiter x402 Swap Integration (DEX Swaps)
+
+**For agents that need to perform DEX swaps via Jupiter + x402 payment protocol:**
+
+The `x402_jupiter_fresh_blockhash.mjs` script provides a complete pipeline for executing Jupiter swaps with automatic x402 payment handling, fresh blockhash replacement, and local signing.
+
+```bash
+# Default: Swap 0.02 SOL → USDC
+node scripts/x402_jupiter_fresh_blockhash.mjs
+
+# Swap 1 USDC → SOL
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --input USDC --output SOL --amount 1000000
+
+# Swap SOL → BONK with custom slippage
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --output BONK --amount 100000000 --slippage 100
+
+# Use raw mint addresses
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --input So11111111111111111111111111111111111111112 \
+  --output EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+  --amount 50000000
+```
+
+**CLI Arguments:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--input` | `SOL` | Input token (symbol or mint address) |
+| `--output` | `USDC` | Output token (symbol or mint address) |
+| `--amount` | `20000000` | Amount in lamports/smallest unit |
+| `--slippage` | `50` | Slippage tolerance in basis points (0.5%) |
+
+**Supported Token Symbols:**
+- `SOL`, `USDC`, `USDT`, `BONK`, `JUP`, `WIF`
+- Or use raw mint addresses for any SPL token
+
+**Pipeline Flow:**
+```
+1. Call Jupiter API via x402_faremeter.ts
+   ↓ (x402 payment handled automatically by @faremeter/rides)
+2. Extract transaction from Jupiter response
+   ↓
+3. Get fresh blockhash from Fuego server
+   ↓
+4. Replace blockhash in transaction
+   ↓
+5. Sign locally with ~/.fuego/wallet.json
+   ↓
+6. Submit via /submit-versioned-transaction
+   ↓
+✅ On-chain swap complete!
+```
+
+**When to use this:**
+- ✅ **DEX swaps** via Jupiter (best rates, multi-hop routes)
+- ✅ **Complex trades** requiring Jupiter routing
+- ✅ **Swaps as a service** (x402 payment integration)
+- ❌ **Simple transfers** — use `fuego send` instead
+
+---
+
+**When to use CLI vs direct API:**
+- Use `fuego send` for: Direct transfers (SOL, USDC, USDT)
+- Use `x402_jupiter_fresh_blockhash.mjs` for: DEX swaps via Jupiter with x402 payment
+- Use raw API for: Custom integrations (not recommended for most agents)### 🛠️ Alternative: Raw API Integration (Not Recommended)
 
 *If you absolutely must use raw API calls instead of the superior Python script:*
 
