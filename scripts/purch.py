@@ -213,11 +213,11 @@ def sign_transaction(base64_tx):
         # Get the blockhash from the transaction message
         blockhash = transaction.message.recent_blockhash
         
-        # Sign transaction with blockhash
-        signed_tx = transaction.sign([keypair], blockhash)
+        # Partial sign - only add our signature (facilitator will add theirs)
+        transaction.partial_sign([keypair], blockhash)
         
         # Serialize signed transaction
-        signed_bytes = bytes(signed_tx)
+        signed_bytes = bytes(transaction)
         signed_base64 = base64.b64encode(signed_bytes).decode('utf-8')
         
         print("✅ Transaction signed")
@@ -285,8 +285,26 @@ def sign_and_submit_order(order_data):
         print(f"   Data: {json.dumps(order_data, indent=2)}")
         sys.exit(1)
     
-    # Sign the order transaction
-    signed_tx = sign_transaction(serialized_tx)
+    try:
+        # Decode base64 transaction
+        tx_bytes = base64.b64decode(serialized_tx)
+        
+        # Deserialize transaction
+        transaction = Transaction.from_bytes(tx_bytes)
+        
+        # Get the blockhash from the transaction message
+        blockhash = transaction.message.recent_blockhash
+        
+        # Partial sign - only add our signature
+        transaction.partial_sign([keypair], blockhash)
+        
+        # Serialize signed transaction
+        signed_bytes = bytes(transaction)
+        signed_base64 = base64.b64encode(signed_bytes).decode('utf-8')
+        
+    except Exception as e:
+        print(f"❌ Failed to sign order transaction: {e}")
+        sys.exit(1)
     
     print("📤 Step 7: Submitting order transaction to blockchain...")
     
@@ -294,7 +312,7 @@ def sign_and_submit_order(order_data):
         # Submit via Rust server
         payload = {
             "network": "mainnet-beta",
-            "transaction": signed_tx
+            "transaction": signed_base64
         }
         
         response = requests.post(
