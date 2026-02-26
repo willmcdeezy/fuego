@@ -210,8 +210,11 @@ def sign_transaction(base64_tx):
         # Deserialize transaction
         transaction = Transaction.from_bytes(tx_bytes)
         
-        # Sign transaction
-        signed_tx = transaction.sign([keypair])
+        # Get the blockhash from the transaction message
+        blockhash = transaction.message.recent_blockhash
+        
+        # Sign transaction with blockhash
+        signed_tx = transaction.sign([keypair], blockhash)
         
         # Serialize signed transaction
         signed_bytes = bytes(signed_tx)
