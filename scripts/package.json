@@ -1,0 +1,12 @@
+{
+  "name": "fuego-scripts",
+  "version": "1.0.0",
+  "description": "Fuego utility scripts for x402 and blockchain interactions",
+  "scripts": {
+    "purch": "node x402_purch.js"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.91.0",
+    "node-fetch": "^2.7.0"
+  }
+}
