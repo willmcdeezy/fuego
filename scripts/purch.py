@@ -233,21 +233,11 @@ def submit_x402_payment(signed_tx, original_payload):
     print("📤 Step 5: Submitting x402 payment to purch.xyz...")
     
     try:
-        # Build x402 payment header
-        payment_payload = {
-            "x402Version": 2,
-            "scheme": "exact",
-            "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-            "payload": {
-                "transaction": signed_tx  # The signed transaction
-            }
-        }
-        
+        # For x402 exact scheme on Solana, the X-PAYMENT-SIGNATURE header
+        # should contain the base64-encoded signed transaction directly
         headers = {
             "Content-Type": "application/json",
-            "X-PAYMENT-SIGNATURE": base64.b64encode(
-                json.dumps(payment_payload).encode()
-            ).decode('utf-8')
+            "X-PAYMENT-SIGNATURE": signed_tx  # Direct base64 signed transaction
         }
         
         response = requests.post(
@@ -262,7 +252,9 @@ def submit_x402_payment(signed_tx, original_payload):
         
         elif response.status_code == 402:
             print("❌ Payment rejected (still requiring payment)")
-            print(f"   Response: {response.text}")
+            print(f"   Status: {response.status_code}")
+            print(f"   Headers: {dict(response.headers)}")
+            print(f"   Body: {response.text}")
             sys.exit(1)
         
         else:
