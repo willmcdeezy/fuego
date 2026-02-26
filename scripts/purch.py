@@ -336,6 +336,7 @@ def main():
     parser.add_argument('--state', required=True, help='State/Province (2-letter code)')
     parser.add_argument('--postal-code', required=True, help='Postal/ZIP code')
     parser.add_argument('--country', default='US', help='Country code (default: US)')
+    parser.add_argument('--test', action='store_true', help='Test mode - stop after receiving order response')
     
     args = parser.parse_args()
     
@@ -394,6 +395,20 @@ def main():
     
     # Step 5: Submit x402 payment
     order_data = submit_x402_payment(signed_tx, order_payload)
+    
+    # TEST MODE: Stop here and output the response
+    if args.test:
+        print()
+        print("=" * 50)
+        print("🧪 TEST MODE - Stopping before final submission")
+        print("=" * 50)
+        print()
+        print("📦 Order Data received from purch.xyz:")
+        print(json.dumps(order_data, indent=2))
+        print()
+        print("✅ x402 payment was accepted!")
+        print("   Next step would be: sign and submit order transaction")
+        return
     
     # Step 6 & 7: Sign and submit order transaction
     result = sign_and_submit_order(order_data)
