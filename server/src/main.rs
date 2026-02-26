@@ -113,6 +113,17 @@ struct WalletStore {
 }
 
 #[derive(Serialize, Deserialize)]
+struct X402PurchPaymentRequest {
+    network: String,
+    payer_address: String,
+    pay_to_address: String,
+    amount: String, // In smallest units (e.g., 10000 for $0.01 USDC)
+    asset: String,  // Token mint address (USDC)
+    #[serde(default)]
+    fee_payer: Option<String>, // Optional fee payer (for gasless payments)
+}
+
+#[derive(Serialize, Deserialize)]
 struct GetAccountSignatures {
     address: String,
     network: String,
@@ -806,6 +817,152 @@ async fn build_transfer_usdt(
     .into_response()
 }
 
+// x402 Purch Payment endpoint - builds USDC transfer for x402 exact scheme
+async fn build_x402_purch_payment(
+    State(_state): State<AppState>,
+    Json(payload): Json<X402PurchPaymentRequest>,
+) -> Response {
+    // Fetch fresh blockhash
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let blockhash = match rpc.get_latest_blockhash() {
+        Ok(bh) => bh,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to fetch blockhash: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    // Parse addresses
+    let payer_pubkey = match string_to_pub_key(&payload.payer_address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid payer_address"
+            }))
+            .into_response();
+        }
+    };
+
+    let pay_to_pubkey = match string_to_pub_key(&payload.pay_to_address) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid pay_to_address"
+            }))
+            .into_response();
+        }
+    };
+
+    let asset_mint = match string_to_pub_key(&payload.asset) {
+        Ok(mint) => mint,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid asset mint address"
+            }))
+            .into_response();
+        }
+    };
+
+    // Derive token accounts
+    let source_token_account = get_associated_token_address(&payer_pubkey, &asset_mint);
+    let destination_token_account = get_associated_token_address(&pay_to_pubkey, &asset_mint);
+
+    // Parse amount (already in smallest units as string)
+    let amount: u64 = match payload.amount.parse::<u64>() {
+        Ok(val) => val,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid amount - must be in smallest token units (e.g., 10000 for $0.01 USDC)"
+            }))
+            .into_response();
+        }
+    };
+
+    // Build transfer instruction
+    let transfer_instruction = match token_instruction::transfer(
+        &spl_token::ID,
+        &source_token_account,
+        &destination_token_account,
+        &payer_pubkey,
+        &[&payer_pubkey],
+        amount,
+    ) {
+        Ok(instr) => instr,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to create transfer instruction"
+            }))
+            .into_response();
+        }
+    };
+
+    // Determine fee payer
+    let fee_payer_pubkey = if let Some(fee_payer) = &payload.fee_payer {
+        match string_to_pub_key(fee_payer) {
+            Ok(pk) => pk,
+            Err(_) => {
+                return Json(json!({
+                    "success": false,
+                    "error": "Invalid fee_payer address"
+                }))
+                .into_response();
+            }
+        }
+    } else {
+        payer_pubkey
+    };
+
+    // Build instructions
+    let compute_limit = ComputeBudgetInstruction::set_compute_unit_limit(100_000);
+    let unit_price = ComputeBudgetInstruction::set_compute_unit_price(0); // No priority fee for x402
+
+    // Create transaction message
+    let message = Message::new_with_blockhash(
+        &[compute_limit, unit_price, transfer_instruction],
+        Some(&fee_payer_pubkey),
+        &blockhash,
+    );
+
+    let transaction = Transaction::new_unsigned(message);
+
+    // Serialize transaction
+    let serialized_tx = match bincode::serialize(&transaction) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Failed to serialize transaction"
+            }))
+            .into_response();
+        }
+    };
+
+    Json(json!({
+        "success": true,
+        "data": {
+            "transaction": general_purpose::STANDARD.encode(&serialized_tx),
+            "blockhash": blockhash.to_string(),
+            "payer": payload.payer_address,
+            "pay_to": payload.pay_to_address,
+            "amount": payload.amount,
+            "asset": payload.asset,
+            "network": payload.network,
+            "scheme": "exact"
+        }
+    }))
+    .into_response()
+}
+
 async fn submit_transaction(
     State(_state): State<AppState>,
     Json(payload): Json<SubmitTransactionRequest>,
@@ -1045,6 +1202,7 @@ async fn main() {
         .route("/build-transfer-usdc", post(build_transfer_usdc))
         .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/build-transfer-usdt", post(build_transfer_usdt))
+        .route("/build-x402-purch-payment", post(build_x402_purch_payment))
         .route("/submit-transaction", post(submit_transaction))
         .route("/submit-versioned-transaction", post(submit_versioned_transaction))
         .layer(cors)
@@ -1065,6 +1223,7 @@ async fn main() {
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
     println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)");
+    println!("    POST /build-x402-purch-payment - Build x402 exact scheme payment for Purch.xyz");
     println!("    POST /submit-transaction - Broadcast signed transaction (legacy format - fuego transfers)");
     println!("    POST /submit-versioned-transaction - Broadcast VersionedTransaction (Jupiter/v0 format)");
     println!("  HISTORY:");
