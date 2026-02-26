@@ -21,4 +21,4 @@ bincode = "1.3"
 base64 = "0.22.0"
 dirs = "5.0"
 reqwest = { version = "0.11", features = ["json", "tokio-native-tls"] }
-x402-chain-solana = { version = "0.1", features = ["client"] }
+x402-chain-solana = "1.4.1"
