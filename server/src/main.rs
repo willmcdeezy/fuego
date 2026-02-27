@@ -62,7 +62,6 @@ mod system_instruction {
 }
 
 use crate::compute_budget::ComputeBudgetInstruction;
-use crate::system_instruction;
 use axum::{
     extract::State,
     http::Method,
@@ -87,10 +86,6 @@ use utils::string_to_pub_key;
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::fs;
-
-// x402 imports
-use x402_chain_solana::V2SolanaExact;
-use x402_types::networks::USDC;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -813,12 +808,6 @@ async fn build_x402_purch_payment(
     State(_state): State<AppState>,
     Json(payload): Json<X402PurchPaymentRequest>,
 ) -> Response {
-    use x402_chain_solana::v2_solana_exact::V2SolanaExactClient;
-    use x402_types::{
-        payment::{PaymentPayload, PaymentRequirements},
-        Asset, Amount,
-    };
-    
     // Parse addresses
     let payer_pubkey = match string_to_pub_key(&payload.payer_address) {
         Ok(pk) => pk,
