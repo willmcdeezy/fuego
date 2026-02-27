@@ -1,12 +1,8 @@
 {
   "name": "fuego",
-  "version": "1.1.0",
-  "description": "Local Agentic Solana Wallet - Scripts for x402 payments and Jupiter swaps",
+  "version": "1.3.0",
+  "description": "Local Agentic Solana Wallet",
   "type": "module",
-  "scripts": {
-    "x402": "npx tsx scripts/x402_faremeter.ts",
-    "transfer": "node scripts/fuego_transfer.mjs"
-  },
   "devDependencies": {
     "tsx": "^4.7.0"
   },
