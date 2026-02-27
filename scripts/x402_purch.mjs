@@ -2,9 +2,12 @@
 /**
  * x402_purch.mjs - Call Fuego Rust server /x402-purch to complete a Purch.xyz order with x402 payment.
  *
+ * WORK IN PROGRESS: Waiting on CrossMint functionality (e.g. delivery not yet enabled for all states).
+ * When CrossMint is ready, uncomment the placeholder logic below and remove the early-exit message.
+ *
  * The Rust server handles: POST to Purch URL → 402 → x402-rs signs and retries → returns final response.
  *
- * Usage:
+ * Usage (when enabled):
  *   node x402_purch.mjs --product-url <url> --email <email> --name <name> \
  *     --address-line1 <line1> [--address-line2 <line2>] --city <city> \
  *     --state <state> --postal-code <code> [--country <US>] [--url <purch-endpoint>] [--network <mainnet-beta>]
@@ -28,6 +31,17 @@ import path from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// --- WIP: Waiting on CrossMint. Script exits here and prints message. ---
+console.log("");
+console.log("⏳ Waiting on CrossMint functionality");
+console.log("   (e.g. delivery not yet enabled for all states such as Texas)");
+console.log("   Check back later or contact CrossMint/Purch for availability.");
+console.log("");
+process.exit(0);
+
+// ========== PLACEHOLDER: Full logic below – uncomment when CrossMint is ready ==========
+
+/*
 const RUST_SERVER_URL = process.env.FUEGO_SERVER_URL || "http://127.0.0.1:8080";
 const PURCH_ORDERS_URL = "https://x402.purch.xyz/orders/solana";
 
@@ -140,3 +154,4 @@ main().catch((e) => {
   console.error("❌", e.message);
   process.exit(1);
 });
+*/
