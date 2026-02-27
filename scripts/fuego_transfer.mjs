@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * fuego_transfer.mjs - Sign and submit USDC/SOL/USDT transfers (same logic as fuego_transfer.py).
- * Uses @solana/kit: decode server tx → set fee payer signer → sign → serialize → submit.
+ * Uses @solana/kit only: decode server tx → set fee payer signer → sign → serialize → submit.
+ * Same signing path for USDC, SOL, and USDT (build-transfer-* returns unsigned tx; we sign and submit).
  *
  * Usage:
  *   node fuego_transfer.mjs --to <ADDRESS> --amount <AMOUNT> [--token USDC|SOL|USDT] [--network mainnet-beta] [--server URL]
@@ -84,11 +85,11 @@ async function loadWalletFromFile(walletPath) {
  */
 function getWalletAddress() {
   const homeDir = process.env.HOME || process.env.USERPROFILE;
-  const configPath = path.join(homeDir, '.fuego', 'wallet-config.json');
-  
+  const configPath = path.join(homeDir, ".fuego", "wallet-config.json");
+
   if (fs.existsSync(configPath)) {
     try {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
       if (config.publicKey) {
         return config.publicKey;
       }
@@ -96,12 +97,12 @@ function getWalletAddress() {
       console.warn("⚠️  Could not read wallet-config.json:", e.message);
     }
   }
-  
+
   // Fallback: derive from wallet.json
-  const walletPath = path.join(homeDir, '.fuego', 'wallet.json');
+  const walletPath = path.join(homeDir, ".fuego", "wallet.json");
   if (fs.existsSync(walletPath)) {
     try {
-      const walletData = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+      const walletData = JSON.parse(fs.readFileSync(walletPath, "utf8"));
       if (walletData.address) {
         return walletData.address;
       }
@@ -109,7 +110,7 @@ function getWalletAddress() {
       console.warn("⚠️  Could not read wallet.json:", e.message);
     }
   }
-  
+
   throw new Error("Could not find wallet address. Run 'fuego create' first.");
 }
 
@@ -210,6 +211,9 @@ async function main() {
     console.error(
       "Usage: node fuego_transfer.mjs --to <ADDRESS> --amount <AMOUNT> [--token USDC|SOL|USDT] [--network] [--server]",
     );
+    console.error(
+      "       For SOL transfers, pass --token SOL (default is USDC).",
+    );
     process.exit(1);
   }
   if (!["USDC", "SOL", "USDT"].includes(token)) {
@@ -228,6 +232,9 @@ async function main() {
 
   console.log("🔥 Fuego Agent Transaction Signer (Node / @solana/kit)");
   console.log(`Network: ${network}`);
+  console.log(
+    `Token:   ${token} (endpoint: build-transfer-${token.toLowerCase()})`,
+  );
   console.log(`From: ${fromAddr}`);
   console.log(`To: ${toAddr}`);
   console.log(`Amount: ${amount} ${token}`);
@@ -298,6 +305,9 @@ async function main() {
       );
     } else {
       console.error("❌ Error:", e.message);
+      if (e.context)
+        console.error("   Context:", JSON.stringify(e.context, null, 2));
+      if (e.cause) console.error("   Cause:", e.cause.message || e.cause);
     }
     process.exit(1);
   }
