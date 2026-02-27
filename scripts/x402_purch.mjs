@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * x402_purch.js - Node.js script for Purch.xyz x402 payments
+ * x402_purch.mjs - Node.js script for Purch.xyz x402 payments
  * 
  * Flow:
  * 1. Call purch.xyz → get 402 challenge
- * 2. Call Rust server (x402_purch_payment) → get unsigned transaction
- * 3. Sign transaction with Solana web3.js
- * 4. Submit to purch.xyz with X-PAYMENT-SIGNATURE header
- * 5. Check if payment was accepted
+ * 2. Call Rust server (build-x402-purch-payment) → get payment requirements
+ * 3. Build x402 payment header with correct format
+ * 4. Sign transaction with Solana web3.js
+ * 5. Submit to purch.xyz with X-PAYMENT-SIGNATURE header
+ * 6. Stop when we get 200 (receive order transaction)
  * 
  * Usage:
- *   node x402_purch.js --product-url <url> --email <email> ...
+ *   node x402_purch.mjs --product-url <url> --email <email> ...
  */
 
 import fs from 'fs';
@@ -25,7 +26,6 @@ const __dirname = path.dirname(__filename);
 // Constants
 const PURCH_API_URL = 'https://x402.purch.xyz/orders/solana';
 const RUST_SERVER_URL = 'http://127.0.0.1:8080';
-const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 // Parse command line args
 function parseArgs() {
@@ -111,7 +111,13 @@ async function sendOrderRequest(productUrl, email, physicalAddress) {
       
       const paymentData = JSON.parse(Buffer.from(paymentHeader, 'base64').toString());
       console.log('✅ Received x402 payment challenge');
-      return paymentData;
+      
+      // Save the original 402 response for later
+      return {
+        paymentData,
+        originalHeader: paymentHeader,
+        orderPayload: payload
+      };
     }
     
     throw new Error(`Expected 402, got ${response.status}`);
@@ -135,25 +141,26 @@ function parseRequirements(paymentData) {
   
   const requirements = {
     scheme: option.scheme,
-    network: option.network.replace('solana:', ''), // Remove prefix for Rust
+    network: option.network,
     amount: option.amount,
     asset: option.asset,
     pay_to: option.payTo,
     fee_payer: option.extra?.feePayer,
-    max_timeout_seconds: option.maxTimeoutSeconds || 300
+    max_timeout_seconds: option.maxTimeoutSeconds || 300,
+    resource: paymentData.resource
   };
   
   const amountHuman = parseInt(requirements.amount) / 1_000_000;
   console.log(`   💰 Amount: $${amountHuman.toFixed(2)} USDC (${requirements.amount} units)`);
   console.log(`   📍 Pay to: ${requirements.pay_to}`);
-  console.log(`   ⏱️  Timeout: ${requirements.max_timeout_seconds}s`);
+  console.log(`   🌐 Resource: ${requirements.resource?.url || 'N/A'}`);
   
   return requirements;
 }
 
-// Step 3: Call Rust server to build x402 payment
+// Step 3: Call Rust server to build x402 payment transaction
 async function buildX402Payment(requirements) {
-  console.log('🔧 Step 3: Building payment via Rust server...');
+  console.log('🔧 Step 3: Building payment transaction via Rust server...');
   
   const payerAddress = getWalletAddress();
   
@@ -185,7 +192,7 @@ async function buildX402Payment(requirements) {
     }
     
     console.log('✅ Transaction built by Rust server');
-    return result.data.transaction; // Base64 encoded
+    return result.data.transaction; // Base64 encoded unsigned transaction
     
   } catch (e) {
     console.error('❌ Failed to build payment:', e.message);
@@ -206,7 +213,7 @@ function signTransaction(base64Tx) {
     // Deserialize transaction
     const transaction = Transaction.from(txBytes);
     
-    // Partial sign (we're one of multiple signers)
+    // Partial sign (we're one of multiple signers - facilitator will add theirs)
     transaction.partialSign(keypair);
     
     // Serialize signed transaction
@@ -224,23 +231,40 @@ function signTransaction(base64Tx) {
   }
 }
 
-// Step 5: Submit x402 payment to purch.xyz
-async function submitX402Payment(signedTx, originalPayload) {
-  console.log('📤 Step 5: Submitting x402 payment...');
+// Step 5: Build x402 payment header with CORRECT format
+function buildX402PaymentHeader(signedTx, original402Data) {
+  console.log('📋 Step 5: Building x402 payment header...');
+  
+  // Get the first accepted option from original 402 response
+  const acceptedOption = original402Data.paymentData.accepts[0];
+  
+  // Build the CORRECT x402 v2 format (snake_case, not camelCase)
+  const paymentPayload = {
+    x402_version: 2,
+    scheme: 'exact',
+    network: acceptedOption.network,
+    payload: {
+      transaction: signedTx
+    }
+  };
+  
+  console.log('   📝 x402 payment payload structure:');
+  console.log(`      x402_version: ${paymentPayload.x402_version}`);
+  console.log(`      scheme: ${paymentPayload.scheme}`);
+  console.log(`      network: ${paymentPayload.network}`);
+  console.log(`      payload.transaction: ${signedTx.substring(0, 50)}...`);
+  
+  // Base64 encode the JSON
+  const paymentHeader = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
+  
+  return paymentHeader;
+}
+
+// Step 6: Submit x402 payment to purch.xyz
+async function submitX402Payment(paymentHeader, originalPayload) {
+  console.log('📤 Step 6: Submitting x402 payment to purch.xyz...');
   
   try {
-    // Build x402 payment header (base64 JSON)
-    const paymentPayload = {
-      x402Version: 2,
-      scheme: 'exact',
-      network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
-      payload: {
-        transaction: signedTx
-      }
-    };
-    
-    const paymentHeader = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
-    
     const response = await fetch(PURCH_API_URL, {
       method: 'POST',
       headers: {
@@ -253,16 +277,23 @@ async function submitX402Payment(signedTx, originalPayload) {
     console.log(`   Response status: ${response.status}`);
     
     if (response.status === 201) {
-      console.log('✅ PAYMENT ACCEPTED!');
-      return await response.json();
+      console.log('✅✅✅ PAYMENT ACCEPTED! (200 OK)');
+      const result = await response.json();
+      return result;
     }
     
     if (response.status === 402) {
       console.log('❌ Payment rejected (still 402)');
       const paymentRequired = response.headers.get('payment-required');
-      console.log('   Payment-Required header:', paymentRequired ? 'present' : 'missing');
+      if (paymentRequired) {
+        console.log('   New Payment-Required header received');
+        const decoded = JSON.parse(Buffer.from(paymentRequired, 'base64').toString());
+        console.log('   Error:', decoded.error || 'Unknown');
+      }
       const body = await response.text();
-      console.log('   Body:', body);
+      if (body) {
+        console.log('   Body:', body);
+      }
       return null;
     }
     
@@ -302,53 +333,63 @@ async function main() {
   }
   
   console.log('🛒 Starting Purch.xyz x402 Payment Flow (Node.js)');
-  console.log('=' .repeat(50));
+  console.log('=' .repeat(60));
   console.log(`   Product: ${args.product_url}`);
   console.log(`   Email: ${args.email}`);
   console.log(`   Wallet: ${getWalletAddress()}`);
-  console.log('=' .repeat(50));
+  console.log('=' .repeat(60));
   console.log();
-  
-  const orderPayload = {
-    email: args.email,
-    productUrl: args.product_url,
-    physicalAddress
-  };
   
   try {
     // Step 1: Get 402 challenge
-    const paymentData = await sendOrderRequest(args.product_url, args.email, physicalAddress);
+    const { paymentData, originalHeader, orderPayload } = await sendOrderRequest(
+      args.product_url, 
+      args.email, 
+      physicalAddress
+    );
     
     // Step 2: Parse requirements
     const requirements = parseRequirements(paymentData);
     
-    // Step 3: Build payment via Rust
+    // Step 3: Build payment transaction via Rust server
     const unsignedTx = await buildX402Payment(requirements);
     
     // Step 4: Sign transaction
     const signedTx = signTransaction(unsignedTx);
     
-    // Step 5: Submit payment
-    const result = await submitX402Payment(signedTx, orderPayload);
+    // Step 5: Build x402 payment header with CORRECT format
+    const paymentHeader = buildX402PaymentHeader(signedTx, { paymentData, originalHeader });
+    
+    // Step 6: Submit payment
+    const result = await submitX402Payment(paymentHeader, orderPayload);
     
     if (result) {
       console.log();
-      console.log('=' .repeat(50));
-      console.log('🎉 x402 PAYMENT WORKED!');
-      console.log('   Order ID:', result.orderId);
-      console.log('   Client Secret:', result.clientSecret ? '***' : 'missing');
-      console.log('   Has serializedTransaction:', result.serializedTransaction ? 'yes' : 'no');
-      console.log('=' .repeat(50));
-      
-      // Show full response
+      console.log('=' .repeat(60));
+      console.log('🎉🎉🎉 SUCCESS! x402 PAYMENT ACCEPTED!');
+      console.log('=' .repeat(60));
       console.log();
-      console.log('📦 Full response:');
+      console.log('📦 Order Response:');
+      console.log(`   Order ID: ${result.orderId}`);
+      console.log(`   Client Secret: ${result.clientSecret ? '***[REDACTED]***' : 'N/A'}`);
+      console.log(`   Has serializedTransaction: ${result.serializedTransaction ? '✅ YES' : '❌ NO'}`);
+      console.log();
+      
+      if (result.serializedTransaction) {
+        console.log('✅ We have the order transaction!');
+        console.log('   This is what we would sign and submit to complete the purchase.');
+        console.log('   (Stopping here as requested)');
+      }
+      
+      console.log();
+      console.log('📋 Full Response:');
       console.log(JSON.stringify(result, null, 2));
+      
     } else {
       console.log();
-      console.log('=' .repeat(50));
-      console.log('❌ x402 payment failed - still getting 402');
-      console.log('=' .repeat(50));
+      console.log('=' .repeat(60));
+      console.log('❌ x402 payment failed - could not get 200 OK');
+      console.log('=' .repeat(60));
     }
     
   } catch (e) {
