@@ -75,7 +75,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::CommitmentConfig;
 use solana_sdk::message::Message;
 use solana_sdk::transaction::Transaction;
-use solana_system_interface::instruction::transfer;
+use solana_system_interface::instruction;
 use solana_transaction::versioned::VersionedTransaction as ClientVersionedTransaction;
 use solana_transaction::Transaction as ClientTransaction;
 use spl_associated_token_account::get_associated_token_address;
@@ -641,7 +641,7 @@ async fn build_transfer_sol(
     };
 
     // Build instructions using solana_system_interface
-    let transfer_instruction = transfer(
+    let transfer_instruction = instruction::transfer(
         &from_pubkey,
         &to_pubkey,
         amount_lamports
