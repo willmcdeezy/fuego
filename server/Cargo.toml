@@ -13,6 +13,7 @@ solana-client = "3.1.9"
 solana-sdk = "4.0.1"
 spl-associated-token-account = "4.0.0"
 solana-transaction-status = "3.1.9"
+solana-transaction = { version = "3.0.2", features = ["bincode"] }
 chrono = { version = "0.4.34", features = ["serde", "clock"] }
 spl-token = "6.0.0"
 spl-memo = "5.0.0"

@@ -1,5 +1,67 @@
 mod utils;
 
+/// Compute budget instructions (solana_sdk 4.x no longer exposes compute_budget module).
+mod compute_budget {
+    use solana_sdk::instruction::Instruction;
+    use solana_sdk::pubkey::Pubkey;
+    use std::sync::OnceLock;
+
+    fn program_id() -> &'static Pubkey {
+        static ID: OnceLock<Pubkey> = OnceLock::new();
+        ID.get_or_init(|| "ComputeBudget111111111111111111111111111111".parse().unwrap())
+    }
+
+    pub struct ComputeBudgetInstruction;
+
+    impl ComputeBudgetInstruction {
+        pub fn set_compute_unit_limit(units: u32) -> Instruction {
+            let mut data = vec![2u8];
+            data.extend_from_slice(&units.to_le_bytes());
+            Instruction {
+                program_id: *program_id(),
+                data,
+                accounts: vec![],
+            }
+        }
+        pub fn set_compute_unit_price(micro_lamports: u64) -> Instruction {
+            let mut data = vec![3u8];
+            data.extend_from_slice(&micro_lamports.to_le_bytes());
+            Instruction {
+                program_id: *program_id(),
+                data,
+                accounts: vec![],
+            }
+        }
+    }
+}
+
+/// System program instructions (solana_sdk 4.x no longer exposes system_instruction module).
+mod system_instruction {
+    use solana_sdk::instruction::{AccountMeta, Instruction};
+    use solana_sdk::pubkey::Pubkey;
+    use std::sync::OnceLock;
+
+    fn system_program_id() -> &'static Pubkey {
+        static ID: OnceLock<Pubkey> = OnceLock::new();
+        ID.get_or_init(|| "11111111111111111111111111111111".parse().unwrap())
+    }
+
+    /// Transfer lamports from one account to another (system program).
+    pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, lamports: u64) -> Instruction {
+        let mut data = vec![2u8]; // SystemInstruction::Transfer discriminant
+        data.extend_from_slice(&lamports.to_le_bytes());
+        Instruction {
+            program_id: *system_program_id(),
+            accounts: vec![
+                AccountMeta::new(*from_pubkey, true),
+                AccountMeta::new(*to_pubkey, false),
+            ],
+            data,
+        }
+    }
+}
+
+use crate::compute_budget::ComputeBudgetInstruction;
 use axum::{
     extract::State,
     http::Method,
@@ -10,11 +72,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::commitment_config::CommitmentConfig;
+use solana_client::rpc_config::CommitmentConfig;
 use solana_sdk::message::Message;
-use solana_sdk::transaction::{Transaction, VersionedTransaction};
-use solana_sdk::compute_budget::ComputeBudgetInstruction;
-use solana_sdk::system_instruction;
+use solana_sdk::transaction::Transaction;
+use solana_transaction::versioned::VersionedTransaction as ClientVersionedTransaction;
+use solana_transaction::Transaction as ClientTransaction;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::instruction as token_instruction;
 use spl_memo;
@@ -130,88 +192,6 @@ struct GetAccountSignatures {
     network: String,
     #[serde(default)]
     limit: Option<usize>,
-}
-
-// x402 Request/Response structs
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402Request {
-    url: String,
-    #[serde(default = "default_method")]
-    method: String,
-    #[serde(default)]
-    headers: std::collections::HashMap<String, String>,
-    #[serde(default)]
-    body: Option<serde_json::Value>,
-}
-
-#[allow(dead_code)]
-fn default_method() -> String {
-    "GET".to_string()
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402PaymentRequirement {
-    asset: String,
-    #[serde(rename = "payTo")]
-    pay_to: String,
-    #[serde(rename = "maxAmountRequired")]
-    max_amount_required: String,
-    network: String,
-    scheme: String,
-    extra: X402Extra,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402Extra {
-    // Use Option for parsing, but require for Solana logic
-    #[serde(rename = "feePayer")]
-    fee_payer: Option<String>,
-    decimals: Option<u8>,
-    #[serde(rename = "recentBlockhash")]
-    recent_blockhash: Option<String>,
-    #[serde(default)]
-    features: Option<serde_json::Value>,
-    // Ignore non-Solana fields completely
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<serde_json::Value>,
-    #[serde(default)] 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    version: Option<serde_json::Value>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "chainId")]
-    chain_id: Option<serde_json::Value>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "verifyingContract")]
-    verifying_contract: Option<serde_json::Value>,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402Response {
-    #[serde(rename = "x402Version")]
-    x402_version: u8,
-    accepts: Vec<X402PaymentRequirement>,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct BalanceResponse {
-    lamports: u64,
-    sol: f64,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct TokenBalanceResponse {
-    amount: String,
-    decimals: u8,
-    ui_amount: String,
 }
 
 // State to hold RPC clients (could be expanded for caching)
@@ -349,9 +329,9 @@ async fn get_usdc_balance(
         }
     };
 
-    let associated_token_account = get_associated_token_address(&pubkey, &usdc_mint);
+    let associated_token_account = get_associated_token_address(&utils::to_spl_pubkey(&pubkey), &utils::to_spl_pubkey(&usdc_mint));
 
-    match rpc.get_token_account_balance(&associated_token_account) {
+    match rpc.get_token_account_balance(&utils::from_spl_pubkey(&associated_token_account)) {
         Ok(balance) => Json(json!({
             "success": true,
             "data": {
@@ -402,9 +382,9 @@ async fn get_usdt_balance(
         }
     };
 
-    let associated_token_account = get_associated_token_address(&pubkey, &usdt_mint);
+    let associated_token_account = get_associated_token_address(&utils::to_spl_pubkey(&pubkey), &utils::to_spl_pubkey(&usdt_mint));
 
-    match rpc.get_token_account_balance(&associated_token_account) {
+    match rpc.get_token_account_balance(&utils::from_spl_pubkey(&associated_token_account)) {
         Ok(balance) => Json(json!({
             "success": true,
             "data": {
@@ -479,8 +459,8 @@ async fn build_transfer_usdc(
     };
 
     // Derive token accounts
-    let source_token_account = get_associated_token_address(&from_pubkey, &usdc_mint);
-    let destination_token_account = get_associated_token_address(&to_pubkey, &usdc_mint);
+    let source_token_account = get_associated_token_address(&utils::to_spl_pubkey(&from_pubkey), &utils::to_spl_pubkey(&usdc_mint));
+    let destination_token_account = get_associated_token_address(&utils::to_spl_pubkey(&to_pubkey), &utils::to_spl_pubkey(&usdc_mint));
 
     // Parse amount (6 decimals for USDC)
     let amount: u64 = match payload.amount.parse::<f64>() {
@@ -507,12 +487,13 @@ async fn build_transfer_usdc(
     };
 
     // Build instructions
+    let from_spl = utils::to_spl_pubkey(&from_pubkey);
     let transfer_instruction = match token_instruction::transfer(
         &spl_token::ID,
         &source_token_account,
         &destination_token_account,
-        &from_pubkey,
-        &[&from_pubkey],
+        &from_spl,
+        &[&from_spl],
         amount,
     ) {
         Ok(instr) => instr,
@@ -537,8 +518,10 @@ async fn build_transfer_usdc(
     );
 
     // Create transaction message with fresh blockhash
+    let transfer_ix = utils::instruction_from_spl(&transfer_instruction);
+    let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        &[compute_limit, unit_price, transfer_ix, memo_ix],
         Some(&from_pubkey),
         &blockhash,
     );
@@ -642,9 +625,7 @@ async fn build_transfer_sol(
     };
 
     // Build instructions
-    use solana_sdk::system_instruction;
-    
-    let transfer_instruction = system_instruction::transfer(&from_pubkey, &to_pubkey, amount_lamports);
+    let transfer_instruction = crate::system_instruction::transfer(&from_pubkey, &to_pubkey, amount_lamports);
     let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[]);
 
     // Compute budget instructions
@@ -657,8 +638,9 @@ async fn build_transfer_sol(
     );
 
     // Create transaction message with fresh blockhash
+    let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        &[compute_limit, unit_price, transfer_instruction, memo_ix],
         Some(&from_pubkey),
         &blockhash,
     );
@@ -749,8 +731,8 @@ async fn build_transfer_usdt(
     };
 
     // Get associated token accounts
-    let from_ata = get_associated_token_address(&from_pubkey, &usdt_mint);
-    let to_ata = get_associated_token_address(&to_pubkey, &usdt_mint);
+    let from_ata = get_associated_token_address(&utils::to_spl_pubkey(&from_pubkey), &utils::to_spl_pubkey(&usdt_mint));
+    let to_ata = get_associated_token_address(&utils::to_spl_pubkey(&to_pubkey), &utils::to_spl_pubkey(&usdt_mint));
 
     // Parse amount (USDT has 6 decimals)
     let amount_ui = match payload.amount.parse::<f64>() {
@@ -768,20 +750,23 @@ async fn build_transfer_usdt(
     // Build instructions
     let compute_limit = ComputeBudgetInstruction::set_compute_unit_limit(300_000);
     let unit_price = ComputeBudgetInstruction::set_compute_unit_price(100);
+    let from_spl = utils::to_spl_pubkey(&from_pubkey);
     let transfer_instruction = token_instruction::transfer(
         &spl_token::id(),
         &from_ata,
         &to_ata,
-        &from_pubkey,
-        &[],
+        &from_spl,
+        &[&from_spl],
         amount,
     ).unwrap();
 
     let memo_text = build_memo("USDT", &payload.from_address, &payload.to_address, amount, &payload.yid, payload.notes.as_deref()).unwrap_or_default();
-    let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[&from_pubkey]);
+    let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[&from_spl]);
 
+    let transfer_ix = utils::instruction_from_spl(&transfer_instruction);
+    let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        &[compute_limit, unit_price, transfer_ix, memo_ix],
         Some(&from_pubkey),
         &blockhash,
     );
@@ -873,8 +858,8 @@ async fn build_x402_purch_payment(
     };
 
     // Derive token accounts
-    let source_token_account = get_associated_token_address(&payer_pubkey, &asset_mint);
-    let destination_token_account = get_associated_token_address(&pay_to_pubkey, &asset_mint);
+    let source_token_account = get_associated_token_address(&utils::to_spl_pubkey(&payer_pubkey), &utils::to_spl_pubkey(&asset_mint));
+    let destination_token_account = get_associated_token_address(&utils::to_spl_pubkey(&pay_to_pubkey), &utils::to_spl_pubkey(&asset_mint));
 
     // Parse amount (already in smallest units as string)
     let amount: u64 = match payload.amount.parse::<u64>() {
@@ -888,13 +873,14 @@ async fn build_x402_purch_payment(
         }
     };
 
+    let payer_spl = utils::to_spl_pubkey(&payer_pubkey);
     // Build transfer instruction
     let transfer_instruction = match token_instruction::transfer(
         &spl_token::ID,
         &source_token_account,
         &destination_token_account,
-        &payer_pubkey,
-        &[&payer_pubkey],
+        &payer_spl,
+        &[&payer_spl],
         amount,
     ) {
         Ok(instr) => instr,
@@ -928,8 +914,9 @@ async fn build_x402_purch_payment(
     let unit_price = ComputeBudgetInstruction::set_compute_unit_price(0); // No priority fee for x402
 
     // Create transaction message
+    let transfer_ix = utils::instruction_from_spl(&transfer_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction],
+        &[compute_limit, unit_price, transfer_ix],
         Some(&fee_payer_pubkey),
         &blockhash,
     );
@@ -984,7 +971,7 @@ async fn submit_transaction(
     };
 
     // Deserialize transaction (already signed by agent with correct blockhash)
-    let transaction: Transaction = match bincode::deserialize(&tx_bytes) {
+    let transaction: ClientTransaction = match bincode::deserialize(&tx_bytes) {
         Ok(tx) => tx,
         Err(_) => {
             return Json(json!({
@@ -1043,7 +1030,7 @@ async fn submit_versioned_transaction(
     };
 
     // Deserialize as VersionedTransaction (Jupiter format)
-    let versioned_transaction: VersionedTransaction = match bincode::deserialize(&tx_bytes) {
+    let versioned_transaction: ClientVersionedTransaction = match bincode::deserialize(&tx_bytes) {
         Ok(tx) => tx,
         Err(_) => {
             return Json(json!({
