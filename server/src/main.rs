@@ -86,7 +86,6 @@ use utils::string_to_pub_key;
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::fs;
-use x402_types::proto::v1::PaymentRequirements;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -177,14 +176,29 @@ struct WalletStore {
 }
 
 #[derive(Serialize, Deserialize)]
-struct X402PurchPaymentRequest {
-    network: String,
-    payer_address: String,
-    pay_to_address: String,
-    amount: String, // In smallest units (e.g., 10000 for $0.01 USDC)
-    asset: String,  // Token mint address (USDC)
+struct X402PurchRequest {
+    /// Purch.xyz order endpoint (e.g. https://x402.purch.xyz/orders/solana) or product URL; server POSTs here with order body
+    url: String,
+    /// Product URL (e.g. Amazon link) - sent as productUrl in the order body
+    product_url: String,
+    email: String,
+    name: String,
     #[serde(default)]
-    fee_payer: Option<String>, // Optional fee payer (for gasless payments)
+    address_line1: String,
+    #[serde(default)]
+    address_line2: Option<String>,
+    city: String,
+    state: String,
+    #[serde(rename = "postal_code")]
+    postal_code: String,
+    #[serde(default)]
+    country: String,
+    /// Solana network (default mainnet-beta). Optional; used for RPC and payment.
+    #[serde(default)]
+    network: String,
+    /// Payer wallet address. If omitted, server uses ~/.fuego wallet to sign the x402 payment.
+    #[serde(default)]
+    payer_address: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -804,160 +818,145 @@ async fn build_transfer_usdt(
     .into_response()
 }
 
-// x402 Purch Payment endpoint - uses x402-rs library to build proper x402 payment
-async fn build_x402_purch_payment(
+// x402 Purch endpoint: call Purch x402 URL with order payload; x402-rs handles 402 → pay → retry; return final response.
+async fn x402_purch(
     State(_state): State<AppState>,
-    Json(payload): Json<X402PurchPaymentRequest>,
+    Json(payload): Json<X402PurchRequest>,
 ) -> Response {
-    use x402_chain_solana::v2_solana_exact::client::V2SolanaExactClient;
-    use x402_types::{
-        proto::v2::{PaymentRequirements, ResourceInfo, X402Version2},
-        Asset, Amount,
+    use reqwest::Client;
+    use std::sync::Arc;
+    use x402_chain_solana::v1_solana_exact::client::V1SolanaExactClient;
+    use x402_reqwest::{ReqwestWithPayments, ReqwestWithPaymentsBuild, X402Client};
+
+    let network = if payload.network.is_empty() {
+        "mainnet-beta".to_string()
+    } else {
+        payload.network.clone()
     };
-    
-    // Parse addresses
-    let payer_pubkey = match string_to_pub_key(&payload.payer_address) {
-        Ok(pk) => pk,
+
+    // Load keypair from ~/.fuego/wallet.json (required for signing x402 payment)
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
+    let wallet_path = home_dir.join(".fuego").join("wallet.json");
+    let wallet_content = match fs::read_to_string(&wallet_path) {
+        Ok(c) => c,
         Err(_) => {
             return Json(json!({
                 "success": false,
-                "error": "Invalid payer_address"
+                "error": "No wallet found at ~/.fuego/wallet.json. Run 'fuego create' first."
             }))
             .into_response();
         }
     };
-    
-    // Parse amount
-    let amount: u64 = match payload.amount.parse::<u64>() {
-        Ok(val) => val,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Invalid amount - must be in smallest token units (e.g., 10000 for $0.01 USDC)"
-            }))
-            .into_response();
-        }
-    };
-    
-    // Build x402 V2 PaymentRequirements using library types
-    let requirements = PaymentRequirements {
-        scheme: "exact".to_string(),
-        network: format!("solana:{}", payload.network),
-        max_amount_required: Amount {
-            amount: amount.to_string(),
-            asset: Asset {
-                address: payload.asset.clone(),
-                decimals: Some(6),
-            },
-        },
-        pay_to: payload.pay_to_address.clone(),
-        resource: ResourceInfo {
-            url: "https://x402.purch.xyz/orders/solana".to_string(),
-            description: Some("Create an e-commerce order".to_string()),
-            mime_type: Some("application/json".to_string()),
-        },
-        max_timeout_seconds: Some(300),
-        extra: payload.fee_payer.map(|fp| {
-            let mut map = std::collections::HashMap::new();
-            map.insert("feePayer".to_string(), fp);
-            map
-        }).unwrap_or_default(),
-    };
-    
-    // Serialize requirements to JSON for the client
-    let requirements_json = match serde_json::to_string(&requirements) {
-        Ok(json) => json,
+    let wallet: WalletStore = match serde_json::from_str(&wallet_content) {
+        Ok(w) => w,
         Err(e) => {
             return Json(json!({
                 "success": false,
-                "error": format!("Failed to serialize requirements: {}", e)
-            }))
-            .into_response();
-        }
-    };
-    
-    Json(json!({
-        "success": true,
-        "data": {
-            "requirements": requirements_json,
-            "payer": payload.payer_address,
-            "pay_to": payload.pay_to_address,
-            "amount": payload.amount,
-            "asset": payload.asset,
-            "network": payload.network,
-            "scheme": "exact",
-            "x402_version": 2,
-            "note": "Use these requirements with x402 library to build payment"
-        }
-    }))
-    .into_response()
-}
-    let unit_price = ComputeBudgetInstruction::set_compute_unit_price(100);
-    let from_spl = utils::to_spl_pubkey(&payer_pubkey);
-    let transfer_instruction = match token_instruction::transfer(
-        &spl_token::id(),
-        &payer_ata,
-        &pay_to_ata,
-        &from_spl,
-        &[&from_spl],
-        amount,
-    ) {
-        Ok(instr) => instr,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Failed to create transfer instruction"
+                "error": format!("Invalid wallet.json: {}", e)
             }))
             .into_response();
         }
     };
 
-    let transfer_ix = utils::instruction_from_spl(&transfer_instruction);
-    let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_ix],
-        Some(&payer_pubkey),
-        &blockhash,
-    );
-    let transaction = Transaction::new_unsigned(message);
-    let serialized_tx = match bincode::serialize(&transaction) {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Failed to serialize transaction"
-            }))
-            .into_response();
-        }
-    };
-    let transaction_b64 = general_purpose::STANDARD.encode(&serialized_tx);
+    if wallet.private_key.len() < 32 {
+        return Json(json!({
+            "success": false,
+            "error": "Wallet private key must be at least 32 bytes"
+        }))
+        .into_response();
+    }
+    let mut secret_arr = [0u8; 32];
+    secret_arr.copy_from_slice(&wallet.private_key[..32]);
 
-    // Serialize requirements for 402 payment structure (client can re-use for x402 flow)
-    let requirements_json = match serde_json::to_string(&requirements) {
-        Ok(json) => json,
+    let keypair = solana_sdk::signer::keypair::Keypair::new_from_array(secret_arr);
+
+    let rpc_url = format!("https://api.{}.solana.com", network);
+    let rpc = solana_client::nonblocking::rpc_client::RpcClient::new(rpc_url);
+    let solana_client = V1SolanaExactClient::new(Arc::new(keypair), Arc::new(rpc));
+    let x402_client = X402Client::new().register(solana_client);
+
+    let http_client = match Client::builder().with_payments(x402_client).build() {
+        Ok(c) => c,
         Err(e) => {
             return Json(json!({
                 "success": false,
-                "error": format!("Failed to serialize requirements: {}", e)
+                "error": format!("Failed to build HTTP client: {}", e)
             }))
             .into_response();
         }
     };
 
-    // Return x402 payment requirements + unsigned transaction (sign in .mjs, then submit for 200)
-    Json(json!({
-        "success": true,
-        "data": {
-            "requirements": requirements_json,
-            "payment_required": serde_json::to_value(&requirements).ok(),
-            "transaction": transaction_b64,
-            "blockhash": blockhash.to_string(),
-            "payer": payload.payer_address,
-            "pay_to": payload.pay_to_address,
-            "amount": payload.amount,
-            "asset": payload.asset,
-            "network": payload.network,
-            "scheme": "exact"
+    let payer_address = payload.payer_address.as_deref().unwrap_or(wallet.address.as_str());
+    let mut physical_address = serde_json::Map::new();
+    physical_address.insert("name".to_string(), serde_json::Value::String(payload.name.clone()));
+    physical_address.insert("line1".to_string(), serde_json::Value::String(payload.address_line1.clone()));
+    physical_address.insert("city".to_string(), serde_json::Value::String(payload.city.clone()));
+    physical_address.insert("state".to_string(), serde_json::Value::String(payload.state.clone()));
+    physical_address.insert("postalCode".to_string(), serde_json::Value::String(payload.postal_code.clone()));
+    physical_address.insert("country".to_string(), serde_json::Value::String(if payload.country.is_empty() { "US".to_string() } else { payload.country.clone() }));
+    if let Some(ref line2) = payload.address_line2 {
+        if !line2.is_empty() {
+            physical_address.insert("line2".to_string(), serde_json::Value::String(line2.clone()));
         }
+    }
+
+    let order_body = json!({
+        "email": payload.email,
+        "payerAddress": payer_address,
+        "productUrl": payload.product_url,
+        "physicalAddress": physical_address
+    });
+    let body_bytes = match serde_json::to_vec(&order_body) {
+        Ok(b) => b,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to serialize order body: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    let response = match http_client
+        .post(&payload.url)
+        .header("Content-Type", "application/json")
+        .body(body_bytes)
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Request failed: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    let status = response.status();
+    let body: String = match response.text().await {
+        Ok(b) => b,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to read response: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    let body_json: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(j) => j,
+        Err(_) => serde_json::Value::String(body),
+    };
+
+    let success = status.is_success();
+    Json(json!({
+        "success": success,
+        "status": status.as_u16(),
+        "data": body_json,
+        "x402_note": if success { "Payment accepted; order response above." } else { "Request completed; check status and data." }
     }))
     .into_response()
 }
@@ -1201,7 +1200,7 @@ async fn main() {
         .route("/build-transfer-usdc", post(build_transfer_usdc))
         .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/build-transfer-usdt", post(build_transfer_usdt))
-        .route("/build-x402-purch-payment", post(build_x402_purch_payment))
+        .route("/x402-purch", post(x402_purch))
         .route("/submit-transaction", post(submit_transaction))
         .route("/submit-versioned-transaction", post(submit_versioned_transaction))
         .layer(cors)
@@ -1222,7 +1221,7 @@ async fn main() {
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
     println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)");
-    println!("    POST /build-x402-purch-payment - Build x402 exact scheme payment for Purch.xyz");
+    println!("    POST /x402-purch - x402 Purch: call Purch URL with order payload (Solana); returns final response");
     println!("    POST /submit-transaction - Broadcast signed transaction (legacy format - fuego transfers)");
     println!("    POST /submit-versioned-transaction - Broadcast VersionedTransaction (Jupiter/v0 format)");
     println!("  HISTORY:");
