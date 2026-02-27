@@ -4,14 +4,13 @@
   "description": "Local Agentic Solana Wallet - Scripts for x402 payments and Jupiter swaps",
   "type": "module",
   "scripts": {
-    "x402": "npx tsx scripts/x402_faremeter.ts"
-  },
-  "dependencies": {
-    "@faremeter/rides": "^0.16.0",
-    "@faremeter/types": "^0.16.0",
-    "@solana/web3.js": "^1.91.0"
+    "x402": "npx tsx scripts/x402_faremeter.ts",
+    "transfer": "node scripts/fuego_transfer.mjs"
   },
   "devDependencies": {
     "tsx": "^4.7.0"
+  },
+  "dependencies": {
+    "@solana/kit": "^6.1.0"
   }
 }
