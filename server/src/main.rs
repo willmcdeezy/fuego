@@ -906,14 +906,6 @@ async fn build_x402_purch_payment(
     }))
     .into_response()
 }
-            "amount": payload.amount,
-            "asset": payload.asset,
-            "network": payload.network,
-            "scheme": "exact"
-        }
-    }))
-    .into_response()
-}
 
 async fn submit_transaction(
     State(_state): State<AppState>,
