@@ -62,6 +62,7 @@ mod system_instruction {
 }
 
 use crate::compute_budget::ComputeBudgetInstruction;
+use crate::system_instruction;
 use axum::{
     extract::State,
     http::Method,
@@ -86,6 +87,10 @@ use utils::string_to_pub_key;
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::fs;
+
+// x402 imports
+use x402_chain_solana::V2SolanaExact;
+use x402_types::networks::USDC;
 
 // Token mint addresses
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -808,21 +813,12 @@ async fn build_x402_purch_payment(
     State(_state): State<AppState>,
     Json(payload): Json<X402PurchPaymentRequest>,
 ) -> Response {
-    // Fetch fresh blockhash
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
-
-    let blockhash = match rpc.get_latest_blockhash() {
-        Ok(bh) => bh,
-        Err(e) => {
-            return Json(json!({
-                "success": false,
-                "error": format!("Failed to fetch blockhash: {}", e)
-            }))
-            .into_response();
-        }
+    use x402_chain_solana::v2_solana_exact::V2SolanaExactClient;
+    use x402_types::{
+        payment::{PaymentPayload, PaymentRequirements},
+        Asset, Amount,
     };
-
+    
     // Parse addresses
     let payer_pubkey = match string_to_pub_key(&payload.payer_address) {
         Ok(pk) => pk,
@@ -834,7 +830,7 @@ async fn build_x402_purch_payment(
             .into_response();
         }
     };
-
+    
     let pay_to_pubkey = match string_to_pub_key(&payload.pay_to_address) {
         Ok(pk) => pk,
         Err(_) => {
@@ -845,23 +841,8 @@ async fn build_x402_purch_payment(
             .into_response();
         }
     };
-
-    let asset_mint = match string_to_pub_key(&payload.asset) {
-        Ok(mint) => mint,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Invalid asset mint address"
-            }))
-            .into_response();
-        }
-    };
-
-    // Derive token accounts
-    let source_token_account = get_associated_token_address(&utils::to_spl_pubkey(&payer_pubkey), &utils::to_spl_pubkey(&asset_mint));
-    let destination_token_account = get_associated_token_address(&utils::to_spl_pubkey(&pay_to_pubkey), &utils::to_spl_pubkey(&asset_mint));
-
-    // Parse amount (already in smallest units as string)
+    
+    // Parse amount
     let amount: u64 = match payload.amount.parse::<u64>() {
         Ok(val) => val,
         Err(_) => {
@@ -872,76 +853,59 @@ async fn build_x402_purch_payment(
             .into_response();
         }
     };
-
-    let payer_spl = utils::to_spl_pubkey(&payer_pubkey);
-    // Build transfer instruction
-    let transfer_instruction = match token_instruction::transfer(
-        &spl_token::ID,
-        &source_token_account,
-        &destination_token_account,
-        &payer_spl,
-        &[&payer_spl],
-        amount,
-    ) {
-        Ok(instr) => instr,
-        Err(_) => {
+    
+    // Build x402 payment requirements
+    let requirements = PaymentRequirements {
+        scheme: "exact".to_string(),
+        network: format!("solana:{}", payload.network),
+        max_amount_required: Amount {
+            amount: amount.to_string(),
+            asset: Asset {
+                address: payload.asset.clone(),
+                decimals: Some(6),
+            },
+        },
+        pay_to: payload.pay_to_address.clone(),
+        resource: "https://x402.purch.xyz/orders/solana".to_string(),
+        description: Some("Create an e-commerce order".to_string()),
+        mime_type: Some("application/json".to_string()),
+        max_timeout_seconds: Some(300),
+        extra: payload.fee_payer.map(|fp| {
+            let mut map = std::collections::HashMap::new();
+            map.insert("feePayer".to_string(), serde_json::Value::String(fp));
+            map
+        }).unwrap_or_default(),
+    };
+    
+    // Serialize requirements for the client to use
+    let requirements_json = match serde_json::to_string(&requirements) {
+        Ok(json) => json,
+        Err(e) => {
             return Json(json!({
                 "success": false,
-                "error": "Failed to create transfer instruction"
+                "error": format!("Failed to serialize requirements: {}", e)
             }))
             .into_response();
         }
     };
-
-    // Determine fee payer
-    let fee_payer_pubkey = if let Some(fee_payer) = &payload.fee_payer {
-        match string_to_pub_key(fee_payer) {
-            Ok(pk) => pk,
-            Err(_) => {
-                return Json(json!({
-                    "success": false,
-                    "error": "Invalid fee_payer address"
-                }))
-                .into_response();
-            }
-        }
-    } else {
-        payer_pubkey
-    };
-
-    // Build instructions
-    let compute_limit = ComputeBudgetInstruction::set_compute_unit_limit(100_000);
-    let unit_price = ComputeBudgetInstruction::set_compute_unit_price(0); // No priority fee for x402
-
-    // Create transaction message
-    let transfer_ix = utils::instruction_from_spl(&transfer_instruction);
-    let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_ix],
-        Some(&fee_payer_pubkey),
-        &blockhash,
-    );
-
-    let transaction = Transaction::new_unsigned(message);
-
-    // Serialize transaction
-    let serialized_tx = match bincode::serialize(&transaction) {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return Json(json!({
-                "success": false,
-                "error": "Failed to serialize transaction"
-            }))
-            .into_response();
-        }
-    };
-
+    
+    // For now, return the requirements that the client will use with x402 library
+    // The Node.js client will use these to build the proper payment
     Json(json!({
         "success": true,
         "data": {
-            "transaction": general_purpose::STANDARD.encode(&serialized_tx),
-            "blockhash": blockhash.to_string(),
+            "requirements": requirements_json,
             "payer": payload.payer_address,
             "pay_to": payload.pay_to_address,
+            "amount": payload.amount,
+            "asset": payload.asset,
+            "network": payload.network,
+            "scheme": "exact",
+            "note": "Use these requirements with x402 library to build payment"
+        }
+    }))
+    .into_response()
+}
             "amount": payload.amount,
             "asset": payload.asset,
             "network": payload.network,
