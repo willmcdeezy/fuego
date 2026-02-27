@@ -826,6 +826,7 @@ async fn x402_purch(
     use reqwest::Client;
     use std::sync::Arc;
     use x402_chain_solana::v1_solana_exact::client::V1SolanaExactClient;
+    use x402_chain_solana::v2_solana_exact::client::V2SolanaExactClient;
     use x402_reqwest::{ReqwestWithPayments, ReqwestWithPaymentsBuild, X402Client};
 
     let network = if payload.network.is_empty() {
@@ -872,8 +873,13 @@ async fn x402_purch(
 
     let rpc_url = format!("https://api.{}.solana.com", network);
     let rpc = solana_client::nonblocking::rpc_client::RpcClient::new(rpc_url);
-    let solana_client = V1SolanaExactClient::new(Arc::new(keypair), Arc::new(rpc));
-    let x402_client = X402Client::new().register(solana_client);
+    let rpc_arc = Arc::new(rpc);
+    let keypair_arc = Arc::new(keypair);
+
+    // Register both V1 and V2 Solana exact clients so we match whatever Purch.xyz returns (V1 or V2 402 format)
+    let x402_client = X402Client::new()
+        .register(V1SolanaExactClient::new(keypair_arc.clone(), rpc_arc.clone()))
+        .register(V2SolanaExactClient::new(keypair_arc, rpc_arc));
 
     let http_client = match Client::builder().with_payments(x402_client).build() {
         Ok(c) => c,
