@@ -19,62 +19,48 @@
 
 ## 🚀 Quick Start (5 minutes)
 
-### 1. Clone & Build
+### Recommended: Ask Your Agent
 ```bash
-git clone https://github.com/willmcdeezy/fuego.git
-cd fuego
-npm install
-npm run build
+curl -S https://fuego.cash/skill.md | less
 ```
 
-### 2. Build Server
+**What your agent will do:**
+- Install the [`fuego-cli`](https://www.npmjs.com/package/fuego-cli) tool
+- Use the CLI to install this repo
+- Create a wallet using `fuego-cli`
+- Use the Rust server and scripts to query the blockchain, build transactions, and submit transactions to Solana
+
+The `fuego-cli` gives your agent an easy-to-use, agent-friendly tool to handle these flows with speed and ease.
+
+---
+
+### Manual Install
+
 ```bash
-cd server && cargo build --release
+# 1. Install the CLI
+npm install -g fuego-cli
+
+# 2. Install this repo
+fuego install
+
+# 3. Create a wallet at ~/.fuego
+fuego create
 ```
 
-### 3. Initialize Wallet (Agent-Ready!)
-```bash
-npm run init
-# ✅ Wallet created at ~/.fuego/wallet.json
-# 📁 Backup saved to ~/.config/solana/fuego-backup.json
-# 🚀 No passwords required - ready for agents!
-```
-
-### 4. Start Server
-```bash
-cd server && ./target/release/fuego-server
-# 🔥 Fuego server running on http://127.0.0.1:8080
-```
-
-### 5. View Dashboard
-Open `dashboard/dashboard.html` in your browser to see:
-- ✅ Real-time balances (SOL, USDC, USDT)  
-- 📊 Transaction history (Fuego + All transactions)
-- 🔄 One-click refresh
-- 🎨 Dark/light theme toggle
-
-### 6. Send Transactions (Instant!)
-```bash
-# Agent-ready transaction signing (no password prompts)
-python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.001 --token SOL
-
-# 📂 Loading wallet... ✅ Wallet loaded successfully  
-# 🔐 Signing transaction (no password required)... ✅ Transaction signed instantly
-# 🎉 Transaction on-chain! Agent-ready speed achieved! 🔮
-```
+Your agent is now ready to query balances, build transactions, and submit to the blockchain!
 
 ---
 
 ## 🤖 Why Agents Love Fuego
 
 ### ❌ Traditional Wallets (Agent Nightmare)
-- 🔒 Password prompts block automation
+- 🔒 Remote server with auth can slow and stall access / performance 
 - ⏱️ Slow multi-step processes  
 - 🌐 Browser extensions don't work headlessly
 - 🔐 Private keys exposed to third parties
 
 ### ✅ Fuego (Agent Paradise) 
-- 🚀 **Zero friction**: No passwords, no prompts, unless you want your agent to build that in
+- 🚀 **Zero friction**: Everything is local! Your agent can customize anything it wants!
 - ⚡ **Instant signing**: Millisecond transaction processing  
 - 🏠 **Local-first**: Keys never leave your machine
 - 📡 **REST API**: Standard HTTP endpoints agents understand
@@ -91,21 +77,17 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 - 🛠️ Development setup
 - ❗ Troubleshooting guide
 
-**📋 [ROADMAP.md](./ROADMAP.md)** - What's coming next
-
----
-
 ## 🏗️ Agent-Ready Architecture
 
 ```
-🤖 Agent Script
+🦞 Agent (via CLI)
        ↓ HTTP Request
 🔥 Fuego Server (localhost:8080)
   • GET  /wallet-address (dynamic wallet loading)
   • POST /balance, /usdc-balance, /usdt-balance (query balances)  
   • POST /build-transfer-{sol,usdc,usdt} (build unsigned transaction)
        ↓ Unsigned Transaction
-🤖 Agent Script  
+🦞 Agent (via CLI)
   • Loads ~/.fuego/wallet.json (simple JSON, no password!)
   • Signs transaction locally with solders library
        ↓ Signed Transaction
@@ -186,7 +168,7 @@ cd server && cargo build --release
 
 ### Tech Stack
 - **Server**: Rust + Axum + Solana SDK
-- **Client**: TypeScript + @solana/web3.js
+- **Client**: The CLI (`fuego-cli`)
 - **Dashboard**: Vanilla HTML/CSS/JS (zero dependencies)
 - **Scripts**: Python + solders + requests
 
@@ -217,51 +199,19 @@ cd server && cargo build --release
 
 ---
 
-## 🤖 Agent Integration Examples
+## 🦞 Agent Integration Examples
 
-### Balance Check
-```python
-import requests
-
-response = requests.post('http://127.0.0.1:8080/balance', 
-    json={'network': 'mainnet-beta', 'address': 'YOUR_ADDRESS'})
-balance = response.json()['data']['sol']
-print(f"Balance: {balance} SOL")
+### Check Balance
+```bash
+fuego balance
 ```
 
-### Send Transaction  
-```python
-# Use the included script - handles all complexity
-import subprocess
-
-result = subprocess.run([
-    'python3', 'scripts/sign_and_submit.py',
-    '--from', 'YOUR_ADDRESS',
-    '--to', 'RECIPIENT_ADDRESS', 
-    '--amount', '0.001',
-    '--token', 'SOL'
-], capture_output=True, text=True)
-
-if 'Transaction on-chain' in result.stdout:
-    print("✅ Transaction successful!")
+### Send Transaction
+```bash
+fuego send <recipient> <amount> --token USDC --yes
 ```
 
-### Dashboard Integration
-```javascript
-// Get wallet address dynamically
-const response = await fetch('http://127.0.0.1:8080/wallet-address');
-const {data} = await response.json();
-console.log(`Wallet: ${data.address}`);
-
-// Check USDC balance
-const balanceRes = await fetch('http://127.0.0.1:8080/usdc-balance', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({network: 'mainnet-beta', address: data.address})
-});
-const balance = await balanceRes.json();
-console.log(`USDC: ${balance.data.usdc}`);
-```
+See [fuego-cli documentation](https://github.com/willmcdeezy/fuego-cli) for all available commands.
 
 ---
 
@@ -277,22 +227,6 @@ Currently, Fuego is battle-tested on mainnet with real transactions, but formal 
 - ✅ **E2E tests** - Full transaction workflows
 
 **Want to contribute tests?** Open an issue or PR on GitHub - all test contributions welcome! 🙏
-
----
-
-## 📋 Status & Roadmap
-
-### ✅ v0.1.0 - Agent-Ready Release
-- Zero-password wallet initialization
-- Multi-token support (SOL, USDC, USDT)
-- Professional dashboard with transaction history
-- REST API with complete documentation  
-- Agent-ready transaction scripts
-
-### ⏳ v0.2.0 - Advanced Features (Planned)
-- CLI tool (`fuego balance`, `fuego send`, etc.)
-- Transaction history API endpoint
-- Node.js server option (faster development - won't need rust but may we will see. May continue building in Rust for security and performance)
 
 ---
 
@@ -336,6 +270,6 @@ MIT License - see [LICENSE](LICENSE) for details
 ---
 
 <div align="center">
-<b>🔥 Built for agents. By agents. 🤖</b><br/>
+<b>🔥 Built for agents. By agents. 🦞</b><br/>
 <i>The future of autonomous Solana transactions starts here.</i>
 </div>

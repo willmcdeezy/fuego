@@ -8,7 +8,7 @@ metadata:
       {
         "emoji": "🔥",
         "requires": { "bins": ["curl"], "env": [] },
-        "optional": { "bins": ["python3", "node", "npm"] },
+        "optional": { "bins": ["python3", "node"], "env": [] },
       },
   }
 ---
@@ -34,12 +34,12 @@ Traditional Solana wallets break agent workflows:
 
 ---
 
-## 🚨 **CRITICAL FOR AGENTS: Use The Python Script!** 🚨
+## 🚨 **CRITICAL FOR AGENTS: Use The CLI!** 🚨
 
 **If you're an autonomous agent, DO NOT reinvent transaction flows. Use this:**
 
 ```bash
-python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0.25 --token USDC
+fuego send <recipient> <amount> --token USDC --yes
 ```
 
 **This single command:**
@@ -47,7 +47,7 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 - ✅ Signs locally (zero network key exposure)  
 - ✅ Submits to chain with proper error handling
 - ✅ Returns signature + explorer link
-- ✅ Tracks with auto-generated agent ID
+- ✅ Supports address book contacts
 - ✅ Works with SOL, USDC, USDT via `--token` flag
 
 **🔥 This is THE agent-first approach. Everything else is secondary.** 
@@ -58,50 +58,69 @@ python3 scripts/sign_and_submit.py --from YOUR_ADDRESS --to RECIPIENT --amount 0
 
 ## 🚀 Quick Start (5 Minutes)
 
-### 1. Install & Build
+### 1. Install fuego-cli
 ```bash
-# Clone repo
-git clone https://github.com/willmcdeezy/fuego.git
-cd fuego
-
-# Install dependencies and build
-npm install
-npm run build
-
-# Build server
-cd server && cargo build --release
+npm install -g fuego-cli
 ```
 
-### 2. Initialize Wallet (Password-Free!)
+### 2. Create Wallet (Password-Free!)
 ```bash
 # Create agent-ready wallet (no password required!)
-npm run init
+fuego create
 
 # Output:
 # ✅ Address: DmFyLRiJtc4Bz75hjAqPaEJpDfRe4GEnRLPwc3EgeUZF
-# 📁 Wallet: ~/.fuego/wallet.json (simple JSON format)
+# 📁 Wallet config: ~/.fuego/wallet-config.json
 # 💾 Backup: ~/.config/solana/fuego-backup.json
 ```
 
-### 3. Start Server
+### 3. Install Fuego Project
 ```bash
-cd server && ./target/release/fuego-server
+# For OpenClaw agents (auto-detects ~/.openclaw/workspace)
+fuego install
+
+# For manual/Cursor/Claude Code installs (specify path)
+fuego install --path ~/projects/fuego
+```
+
+### 4. Start Server
+```bash
+fuego serve
 
 # Output:
 # 🔥 Fuego server running on http://127.0.0.1:8080
-# Endpoints:
-#   GET  /wallet-address - Get local wallet address  
-#   POST /balance, /usdc-balance, /usdt-balance - Check balances
-#   POST /build-transfer-{sol,usdc,usdt} - Build unsigned transactions
-#   POST /submit-transaction - Broadcast signed transactions
 ```
 
-### 4. View Dashboard
+### 5. Show Address to Human
 ```bash
-# Open dashboard (works in any browser)
-open dashboard/dashboard.html    # macOS
-firefox dashboard/dashboard.html # Linux  
-start dashboard/dashboard.html   # Windows
+fuego address
+
+# Output:
+# 📍 Your Fuego Address
+# Name: default
+# Public Key: DmFy...eUZF
+```
+
+> 💡 **For humans:** Share this address so they can fund the wallet. They can send SOL from any Solana wallet (Phantom, Solflare, etc.).
+
+### 6. Fund the Wallet
+
+**Option A: MoonPay (for fiat → crypto)**
+- Visit: https://buy.moonpay.com/?currency=SOL&address=YOUR_ADDRESS
+- Minimum: ~$30 USD
+- Instant to wallet
+
+**Option B: Manual transfer**
+- Human copies address from above
+- Sends SOL from their wallet to your Fuego address
+- SOL needed for transaction fees (0.001 SOL per tx)
+
+### 7. Open Dashboard (Optional - Human View)
+```bash
+fuego dashboard
+
+# Opens dashboard.html in default browser
+# Shows: balances, transaction history, real-time updates
 ```
 
 **Dashboard Features:**
@@ -111,22 +130,26 @@ start dashboard/dashboard.html   # Windows
 - 🌓 **Dark/Light themes** - Automatic system detection
 - 🔗 **Explorer links** - Direct to Solana Explorer
 
-### 5. Send Instant Transactions - THE AGENT WAY 🤖
+---
+
+## 🐍 Send Transactions - THE AGENT WAY
 
 **⚡ This is THE recommended approach for all autonomous agents:**
 
 ```bash
 # Perfect agent workflow - zero interaction, instant execution!
-python3 scripts/sign_and_submit.py \
-  --from YOUR_ADDRESS \
-  --to GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5 \
-  --amount 0.25 \
-  --token USDC
+fuego send GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5 0.25 --token USDC --yes
 
 # Output:
+# 📝 Transaction Preview
+# From: DmFy...eUZF
+# To: GvCo...T7r5  
+# Amount: 0.25 USDC
+# 
+# ⏳ Executing transaction via Fuego...
 # 🔥 Fuego Agent Transaction Signer - Agent-Ready Edition
 # 📂 Loading wallet from ~/.fuego/wallet.json...
-# ✅ Wallet loaded successfully  
+# ✅ Wallet loaded successfully
 # 📝 Building unsigned transaction...
 # ✅ Transaction built
 # 🔐 Signing transaction (no password required)...
@@ -140,12 +163,12 @@ python3 scripts/sign_and_submit.py \
 # 🎉 Transaction on-chain! Agent-ready speed achieved! 🔮
 ```
 
-**Why this script is PERFECT for agents:**
-- ✅ **Zero human interaction** - No prompts, no waiting
-- ✅ **Professional CLI interface** - Proper arguments and validation  
+**Why this is PERFECT for agents:**
+- ✅ **Zero human interaction** - No prompts, no waiting (with --yes flag)
+- ✅ **Professional CLI interface** - Clean arguments and validation
 - ✅ **Multi-token support** - SOL, USDC, USDT with `--token` flag
-- ✅ **Auto-generated agent IDs** - Built-in transaction tracking
-- ✅ **Complete status reporting** - Build → Sign → Submit workflow
+- ✅ **Address book integration** - Send to named contacts
+- ✅ **Complete status reporting** - Preview → Build → Sign → Submit workflow
 - ✅ **Explorer link generation** - Instant verification
 - ✅ **Error handling** - Clear failure messages for debugging
 
@@ -355,106 +378,128 @@ Returns all wallet transactions. Fuego transactions (those with `fuego|` in the 
 
 ---
 
-### 🏆 **THE AGENT-FIRST APPROACH: Python Script Integration**
+### 🏆 **For Agents Writing Code (Python, Node.js, etc.)**
 
-**This is THE way autonomous agents should use Fuego. No other method comes close.**
+**Just call the CLI via subprocess. That's it.**
 
+The CLI handles everything: building, signing, submitting, error handling. Don't wrap it in a class — just use it directly.
+
+**Python:**
 ```python
 import subprocess
-import requests
 
-class FuegoAgent:
-    def __init__(self, server_url="http://127.0.0.1:8080"):
-        self.server_url = server_url
-        self.wallet_address = None
-        
-    def get_wallet_address(self):
-        """Get wallet address dynamically"""
-        response = requests.get(f"{self.server_url}/wallet-address")
-        data = response.json()
-        self.wallet_address = data['data']['address']
-        return self.wallet_address
-    
-    def check_balances(self):
-        """Check all token balances"""
-        if not self.wallet_address:
-            self.get_wallet_address()
-            
-        sol_resp = requests.post(f"{self.server_url}/balance", 
-            json={"network": "mainnet-beta", "address": self.wallet_address})
-        usdc_resp = requests.post(f"{self.server_url}/usdc-balance", 
-            json={"network": "mainnet-beta", "address": self.wallet_address})
-        usdt_resp = requests.post(f"{self.server_url}/usdt-balance", 
-            json={"network": "mainnet-beta", "address": self.wallet_address})
-            
-        return {
-            "SOL": sol_resp.json()['data']['sol'],
-            "USDC": usdc_resp.json()['data'].get('ui_amount', 0),
-            "USDT": usdt_resp.json()['data'].get('ui_amount', 0)
-        }
-    
-    def send_payment(self, to_address, amount, token="USDC"):
-        """Send payment using THE professional agent script"""
-        if not self.wallet_address:
-            self.get_wallet_address()
-            
-        result = subprocess.run([
-            'python3', 'scripts/sign_and_submit.py',
-            '--from', self.wallet_address,
-            '--to', to_address,
-            '--amount', str(amount),
-            '--token', token
-        ], capture_output=True, text=True, cwd='/path/to/fuego')
-        
-        if 'Transaction on-chain! Agent-ready speed achieved!' in result.stdout:
-            # Extract signature from output
-            for line in result.stdout.split('\\n'):
-                if line.startswith('Signature:'):
-                    signature = line.split(': ')[1].strip()
-                    return {
-                        'success': True,
-                        'signature': signature,
-                        'explorer': f'https://explorer.solana.com/tx/{signature}?cluster=mainnet-beta'
-                    }
-        else:
-            return {
-                'success': False, 
-                'error': result.stderr or result.stdout
-            }
+# Check balance
+result = subprocess.run(['fuego', 'balance'], capture_output=True, text=True)
+print(result.stdout)
 
-# Perfect agent usage example
-agent = FuegoAgent()
+# Send payment
+result = subprocess.run([
+    'fuego', 'send',
+    'GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5',
+    '0.25',
+    '--token', 'USDC',
+    '--yes'
+], capture_output=True, text=True)
 
-# Get wallet and balances
-print(f"🔥 Agent wallet: {agent.get_wallet_address()}")
-balances = agent.check_balances()
-print(f"💰 Balances: {balances}")
-
-# Send instant payment (zero friction!)
-result = agent.send_payment("GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5", 0.25, "USDC")
-if result['success']:
-    print(f"✅ Payment sent! {result['signature']}")
-    print(f"🔍 Explorer: {result['explorer']}")
+if 'Transaction on-chain!' in result.stdout:
+    print("✅ Payment sent!")
 else:
-    print(f"❌ Failed: {result['error']}")
+    print(f"❌ Error: {result.stderr}")
 ```
 
-**🚀 Why this approach dominates all alternatives:**
+**Node.js/TypeScript:**
+```javascript
+import { execSync } from 'child_process';
 
-| Feature | Fuego Python Script | Raw API Calls | Other Wallets |
-|---------|-------------------|---------------|---------------|
-| **Zero Interaction** | ✅ Perfect | ❌ Complex signing | ❌ Password prompts |
-| **Professional CLI** | ✅ `--from --to --amount --token` | ❌ Manual JSON | ❌ N/A |
-| **Auto Agent IDs** | ✅ Built-in tracking | ❌ Manual | ❌ No tracking |
-| **Status Reporting** | ✅ Build→Sign→Submit | ❌ Silent failures | ❌ Black box |
-| **Multi-token** | ✅ SOL/USDC/USDT | ❌ Separate endpoints | ❌ Limited |
-| **Error Handling** | ✅ Clear messages | ❌ Raw HTTP errors | ❌ Cryptic failures |
-| **Explorer Links** | ✅ Auto-generated | ❌ Manual construction | ❌ None |
-| **Agent Ready** | ✅ **PERFECT** | ❌ Developer-focused | ❌ Human-focused |
+// Send payment
+const result = execSync(
+  'fuego send GvCo... 0.25 --token USDC --yes',
+  { encoding: 'utf-8' }
+);
+console.log(result);
+```
+
+**Why this is perfect:**
+- ✅ **Zero abstraction** — CLI does everything
+- ✅ **Works in any language** — bash, Python, Node, Go, whatever
+- ✅ **Easy to debug** — run the same command manually
+- ✅ **Always up to date** — CLI updates, your code doesn't change
 
 ---
 
 ### 🛠️ Alternative: Raw API Integration (Not Recommended)
+
+*If you absolutely must use raw API calls instead of the CLI:*
+
+---
+
+### 🔄 Jupiter x402 Swap Integration (DEX Swaps)
+
+**For agents that need to perform DEX swaps via Jupiter + x402 payment protocol:**
+
+The `x402_jupiter_fresh_blockhash.mjs` script provides a complete pipeline for executing Jupiter swaps with automatic x402 payment handling, fresh blockhash replacement, and local signing.
+
+```bash
+# Default: Swap 0.02 SOL → USDC
+node scripts/x402_jupiter_fresh_blockhash.mjs
+
+# Swap 1 USDC → SOL
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --input USDC --output SOL --amount 1000000
+
+# Swap SOL → BONK with custom slippage
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --output BONK --amount 100000000 --slippage 100
+
+# Use raw mint addresses
+node scripts/x402_jupiter_fresh_blockhash.mjs \
+  --input So11111111111111111111111111111111111111112 \
+  --output EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+  --amount 50000000
+```
+
+**CLI Arguments:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--input` | `SOL` | Input token (symbol or mint address) |
+| `--output` | `USDC` | Output token (symbol or mint address) |
+| `--amount` | `20000000` | Amount in lamports/smallest unit |
+| `--slippage` | `50` | Slippage tolerance in basis points (0.5%) |
+
+**Supported Token Symbols:**
+- `SOL`, `USDC`, `USDT`, `BONK`, `JUP`, `WIF`
+- Or use raw mint addresses for any SPL token
+
+**Pipeline Flow:**
+```
+1. Call Jupiter API via x402_faremeter.ts
+   ↓ (x402 payment handled automatically by @faremeter/rides)
+2. Extract transaction from Jupiter response
+   ↓
+3. Get fresh blockhash from Fuego server
+   ↓
+4. Replace blockhash in transaction
+   ↓
+5. Sign locally with ~/.fuego/wallet.json
+   ↓
+6. Submit via /submit-versioned-transaction
+   ↓
+✅ On-chain swap complete!
+```
+
+**When to use this:**
+- ✅ **DEX swaps** via Jupiter (best rates, multi-hop routes)
+- ✅ **Complex trades** requiring Jupiter routing
+- ✅ **Swaps as a service** (x402 payment integration)
+- ❌ **Simple transfers** — use `fuego send` instead
+
+---
+
+**When to use CLI vs direct API:**
+- Use `fuego send` for: Direct transfers (SOL, USDC, USDT)
+- Use `x402_jupiter_fresh_blockhash.mjs` for: DEX swaps via Jupiter with x402 payment
+- Use raw API for: Custom integrations (not recommended for most agents)### 🛠️ Alternative: Raw API Integration (Not Recommended)
 
 *If you absolutely must use raw API calls instead of the superior Python script:*
 
@@ -547,8 +592,8 @@ if result['success']:
     print(f"✅ Swap complete: {result['signature']}")
 ```
 
-**When to use this vs sign_and_submit.py:**
-- Use `sign_and_submit.py` for: Direct transfers (SOL, USDC, USDT)
+**When to use CLI vs direct API:**
+- Use `fuego send` for: Direct transfers via CLI (recommended)
 - Use `x402_jupiter_fresh_blockhash.mjs` for: DEX swaps via Jupiter with x402 payment
 
 ---
@@ -681,22 +726,7 @@ def handle_deposit_request(self):
 fuego/
 ├── README.md           # Main documentation
 ├── SKILL.md           # This file (agent integration guide)
-├── ROADMAP.md         # Future plans
-├── COLORS.md          # Brand colors & design system
-├── SETUP_UX.md        # Setup UX documentation
-├── package.json       # Node.js dependencies
-├── tsconfig.json      # TypeScript configuration
-├── src/               # TypeScript source code
-│   ├── index.ts       # Main wallet library
-│   ├── types.ts       # Type definitions
-│   ├── crypto.ts      # Wallet utilities
-│   ├── cli/
-│   │   └── init.ts    # Wallet initialization script
-│   └── __tests__/
-│       └── wallet.test.ts  # Test files
-├── dist/              # Compiled JavaScript (generated)
-│   ├── cli/           # Compiled CLI scripts
-│   └── __tests__/     # Compiled tests
+├── package.json       # Minimal dependencies for x402 scripts
 ├── scripts/           # Agent-ready transaction scripts
 │   ├── sign_and_submit.py           # Python transaction tool
 │   ├── x402_faremeter.ts            # x402 payment handler
@@ -717,30 +747,39 @@ fuego/
 ```
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (1.85+) - **Required for macOS compatibility**
-- [Node.js](https://nodejs.org/) (18+) - For wallet initialization  
+- [fuego-cli](https://www.npmjs.com/package/fuego-cli) - Wallet creation and management (requires Node.js)
+- [Rust](https://rustup.rs/) (1.85+) - **Required for server**
 - [Python](https://python.org/) (3.8+) - For transaction scripts
 
 ### Building from Source
+
+**Option A: Using fuego-cli (Recommended)**
+```bash
+# 1. Install CLI
+npm install -g fuego-cli
+
+# 2. Clone repository
+git clone https://github.com/willmcdeezy/fuego.git
+cd fuego
+
+# 3. Create wallet
+fuego create
+
+# 4. Start server (auto-builds with cargo)
+fuego serve
+```
+
+**Option B: Manual Build**
 ```bash
 # 1. Clone repository
 git clone https://github.com/willmcdeezy/fuego.git
 cd fuego
 
-# 2. Install Node.js dependencies  
-npm install
+# 2. Build Rust server manually
+cd server && cargo build
 
-# 3. Build TypeScript
-npm run build
-
-# 4. Build Rust server
-cd server
-cargo build --release
-# Binary: target/release/fuego-server
-
-# 5. Run tests
-cd ..
-npm test
+# 3. Run server
+./target/debug/fuego-server
 ```
 
 ### Customizing for Your Agents
@@ -776,17 +815,17 @@ const PYUSD_MINT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
 # 1. Create dedicated agent user
 sudo useradd -m -s /bin/bash fuego-agent
 
-# 2. Install Fuego
+# 2. Install fuego-cli (requires Node.js)
+sudo -u fuego-agent npm install -g fuego-cli
+
+# 3. Clone Fuego server
 sudo -u fuego-agent git clone https://github.com/willmcdeezy/fuego.git /home/fuego-agent/fuego
-cd /home/fuego-agent/fuego
-sudo -u fuego-agent npm install
-sudo -u fuego-agent npm run build
-cd server && sudo -u fuego-agent cargo build --release
 
-# 3. Initialize wallet
-sudo -u fuego-agent npm run init
+# 4. Create wallet and install project
+sudo -u fuego-agent fuego create
+sudo -u fuego-agent fuego install --path /home/fuego-agent/fuego
 
-# 4. Create systemd service
+# 5. Create systemd service
 sudo tee /etc/systemd/system/fuego.service << EOF
 [Unit]
 Description=Fuego Solana Wallet Server
@@ -796,7 +835,7 @@ After=network.target
 Type=simple
 User=fuego-agent
 WorkingDirectory=/home/fuego-agent/fuego/server
-ExecStart=/home/fuego-agent/fuego/server/target/release/fuego-server
+ExecStart=/usr/bin/fuego serve
 Restart=always
 RestartSec=10
 
@@ -804,12 +843,25 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-# 5. Start service
+# 6. Start service
 sudo systemctl daemon-reload
 sudo systemctl enable fuego
 sudo systemctl start fuego
 
-# 6. Verify
+# 7. Verify
+curl http://127.0.0.1:8080/wallet-address
+```
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 6. Start service
+sudo systemctl daemon-reload
+sudo systemctl enable fuego
+sudo systemctl start fuego
+
+# 7. Verify
 curl http://127.0.0.1:8080/wallet-address
 ```
 
@@ -831,14 +883,14 @@ curl http://127.0.0.1:8080/wallet-address
 
 **Problem: "Wallet not initialized" error**
 ```bash
-# Solution: Initialize wallet
-npm run init
+# Solution: Create wallet with fuego-cli
+fuego create
 ```
 
 **Problem: "Server not running" error**  
 ```bash
 # Solution: Start server
-cd server && ./target/release/fuego-server
+fuego serve
 ```
 
 **Problem: "Connection refused" error**
@@ -847,7 +899,13 @@ cd server && ./target/release/fuego-server
 curl http://127.0.0.1:8080/health
 
 # If not running, start it
-cd server && ./target/release/fuego-server
+fuego serve
+```
+
+**Problem: "Fuego server not found" error**
+```bash
+# Solution: Install the fuego project
+fuego install
 ```
 
 **Problem: "Transaction simulation failed" error**
@@ -920,28 +978,6 @@ lazy_static! {
 - ⏳ **PYUSD** - PayPal USD (Token-2022 format)
 - ⏳ **Custom SPL tokens** - User-defined mints
 - ⏳ **Compressed NFTs** - Metaplex compression
-
----
-
-## 🔮 Roadmap & Future Features
-
-### v0.2.0 - Enhanced Agent Features
-- 🔄 **CLI tool** - `fuego balance`, `fuego send` commands
-- 📊 **Batch transactions** - Multiple transfers in one call
-- 🔍 **Enhanced history API** - Full transaction parsing
-- 📈 **Performance metrics** - Transaction timing/success rates
-
-### v0.3.0 - Advanced Integration  
-- 🔌 **Hardware wallet support** - Ledger, Trezor integration
-- 🌐 **Multi-network** - Ethereum, Polygon bridge support
-- 🤖 **Agent SDK** - High-level libraries for popular frameworks
-- 📡 **Webhooks** - Real-time transaction notifications
-
-### v1.0.0 - Production Suite
-- 🏭 **Enterprise features** - Multi-tenant, audit logging
-- 🔒 **Enhanced security** - MPC, threshold signing
-- ⚡ **Lightning fast** - Sub-100ms transaction building
-- 🌍 **Global deployment** - Multi-region server options
 
 ---
 

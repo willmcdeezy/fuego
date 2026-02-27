@@ -1,5 +1,67 @@
 mod utils;
 
+/// Compute budget instructions (solana_sdk 4.x no longer exposes compute_budget module).
+mod compute_budget {
+    use solana_sdk::instruction::Instruction;
+    use solana_sdk::pubkey::Pubkey;
+    use std::sync::OnceLock;
+
+    fn program_id() -> &'static Pubkey {
+        static ID: OnceLock<Pubkey> = OnceLock::new();
+        ID.get_or_init(|| "ComputeBudget111111111111111111111111111111".parse().unwrap())
+    }
+
+    pub struct ComputeBudgetInstruction;
+
+    impl ComputeBudgetInstruction {
+        pub fn set_compute_unit_limit(units: u32) -> Instruction {
+            let mut data = vec![2u8];
+            data.extend_from_slice(&units.to_le_bytes());
+            Instruction {
+                program_id: *program_id(),
+                data,
+                accounts: vec![],
+            }
+        }
+        pub fn set_compute_unit_price(micro_lamports: u64) -> Instruction {
+            let mut data = vec![3u8];
+            data.extend_from_slice(&micro_lamports.to_le_bytes());
+            Instruction {
+                program_id: *program_id(),
+                data,
+                accounts: vec![],
+            }
+        }
+    }
+}
+
+/// System program instructions (solana_sdk 4.x no longer exposes system_instruction module).
+mod system_instruction {
+    use solana_sdk::instruction::{AccountMeta, Instruction};
+    use solana_sdk::pubkey::Pubkey;
+    use std::sync::OnceLock;
+
+    fn system_program_id() -> &'static Pubkey {
+        static ID: OnceLock<Pubkey> = OnceLock::new();
+        ID.get_or_init(|| "11111111111111111111111111111111".parse().unwrap())
+    }
+
+    /// Transfer lamports from one account to another (system program).
+    pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, lamports: u64) -> Instruction {
+        let mut data = vec![2u8]; // SystemInstruction::Transfer discriminant
+        data.extend_from_slice(&lamports.to_le_bytes());
+        Instruction {
+            program_id: *system_program_id(),
+            accounts: vec![
+                AccountMeta::new(*from_pubkey, true),
+                AccountMeta::new(*to_pubkey, false),
+            ],
+            data,
+        }
+    }
+}
+
+use crate::compute_budget::ComputeBudgetInstruction;
 use axum::{
     extract::State,
     http::Method,
@@ -10,12 +72,13 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::commitment_config::CommitmentConfig;
+use solana_client::rpc_config::CommitmentConfig;
 use solana_sdk::message::Message;
-use solana_sdk::transaction::{Transaction, VersionedTransaction};
+use solana_sdk::transaction::Transaction;
+use solana_transaction::versioned::VersionedTransaction as ClientVersionedTransaction;
+use solana_transaction::Transaction as ClientTransaction;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::instruction as token_instruction;
-use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use spl_memo;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
@@ -113,93 +176,37 @@ struct WalletStore {
 }
 
 #[derive(Serialize, Deserialize)]
+struct X402PurchRequest {
+    /// Purch.xyz order endpoint (e.g. https://x402.purch.xyz/orders/solana) or product URL; server POSTs here with order body
+    url: String,
+    /// Product URL (e.g. Amazon link) - sent as productUrl in the order body
+    product_url: String,
+    email: String,
+    name: String,
+    #[serde(default)]
+    address_line1: String,
+    #[serde(default)]
+    address_line2: Option<String>,
+    city: String,
+    state: String,
+    #[serde(rename = "postal_code")]
+    postal_code: String,
+    #[serde(default)]
+    country: String,
+    /// Solana network (default mainnet-beta). Optional; used for RPC and payment.
+    #[serde(default)]
+    network: String,
+    /// Payer wallet address. If omitted, server uses ~/.fuego wallet to sign the x402 payment.
+    #[serde(default)]
+    payer_address: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
 struct GetAccountSignatures {
     address: String,
     network: String,
     #[serde(default)]
     limit: Option<usize>,
-}
-
-// x402 Request/Response structs
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402Request {
-    url: String,
-    #[serde(default = "default_method")]
-    method: String,
-    #[serde(default)]
-    headers: std::collections::HashMap<String, String>,
-    #[serde(default)]
-    body: Option<serde_json::Value>,
-}
-
-#[allow(dead_code)]
-fn default_method() -> String {
-    "GET".to_string()
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402PaymentRequirement {
-    asset: String,
-    #[serde(rename = "payTo")]
-    pay_to: String,
-    #[serde(rename = "maxAmountRequired")]
-    max_amount_required: String,
-    network: String,
-    scheme: String,
-    extra: X402Extra,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402Extra {
-    // Use Option for parsing, but require for Solana logic
-    #[serde(rename = "feePayer")]
-    fee_payer: Option<String>,
-    decimals: Option<u8>,
-    #[serde(rename = "recentBlockhash")]
-    recent_blockhash: Option<String>,
-    #[serde(default)]
-    features: Option<serde_json::Value>,
-    // Ignore non-Solana fields completely
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<serde_json::Value>,
-    #[serde(default)] 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    version: Option<serde_json::Value>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "chainId")]
-    chain_id: Option<serde_json::Value>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "verifyingContract")]
-    verifying_contract: Option<serde_json::Value>,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct X402Response {
-    #[serde(rename = "x402Version")]
-    x402_version: u8,
-    accepts: Vec<X402PaymentRequirement>,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct BalanceResponse {
-    lamports: u64,
-    sol: f64,
-}
-
-#[allow(dead_code)]
-#[derive(Serialize, Deserialize)]
-struct TokenBalanceResponse {
-    amount: String,
-    decimals: u8,
-    ui_amount: String,
 }
 
 // State to hold RPC clients (could be expanded for caching)
@@ -337,9 +344,9 @@ async fn get_usdc_balance(
         }
     };
 
-    let associated_token_account = get_associated_token_address(&pubkey, &usdc_mint);
+    let associated_token_account = get_associated_token_address(&utils::to_spl_pubkey(&pubkey), &utils::to_spl_pubkey(&usdc_mint));
 
-    match rpc.get_token_account_balance(&associated_token_account) {
+    match rpc.get_token_account_balance(&utils::from_spl_pubkey(&associated_token_account)) {
         Ok(balance) => Json(json!({
             "success": true,
             "data": {
@@ -390,9 +397,9 @@ async fn get_usdt_balance(
         }
     };
 
-    let associated_token_account = get_associated_token_address(&pubkey, &usdt_mint);
+    let associated_token_account = get_associated_token_address(&utils::to_spl_pubkey(&pubkey), &utils::to_spl_pubkey(&usdt_mint));
 
-    match rpc.get_token_account_balance(&associated_token_account) {
+    match rpc.get_token_account_balance(&utils::from_spl_pubkey(&associated_token_account)) {
         Ok(balance) => Json(json!({
             "success": true,
             "data": {
@@ -467,8 +474,8 @@ async fn build_transfer_usdc(
     };
 
     // Derive token accounts
-    let source_token_account = get_associated_token_address(&from_pubkey, &usdc_mint);
-    let destination_token_account = get_associated_token_address(&to_pubkey, &usdc_mint);
+    let source_token_account = get_associated_token_address(&utils::to_spl_pubkey(&from_pubkey), &utils::to_spl_pubkey(&usdc_mint));
+    let destination_token_account = get_associated_token_address(&utils::to_spl_pubkey(&to_pubkey), &utils::to_spl_pubkey(&usdc_mint));
 
     // Parse amount (6 decimals for USDC)
     let amount: u64 = match payload.amount.parse::<f64>() {
@@ -495,12 +502,13 @@ async fn build_transfer_usdc(
     };
 
     // Build instructions
+    let from_spl = utils::to_spl_pubkey(&from_pubkey);
     let transfer_instruction = match token_instruction::transfer(
         &spl_token::ID,
         &source_token_account,
         &destination_token_account,
-        &from_pubkey,
-        &[&from_pubkey],
+        &from_spl,
+        &[&from_spl],
         amount,
     ) {
         Ok(instr) => instr,
@@ -525,8 +533,10 @@ async fn build_transfer_usdc(
     );
 
     // Create transaction message with fresh blockhash
+    let transfer_ix = utils::instruction_from_spl(&transfer_instruction);
+    let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        &[compute_limit, unit_price, transfer_ix, memo_ix],
         Some(&from_pubkey),
         &blockhash,
     );
@@ -630,9 +640,7 @@ async fn build_transfer_sol(
     };
 
     // Build instructions
-    use solana_sdk::system_instruction;
-    
-    let transfer_instruction = system_instruction::transfer(&from_pubkey, &to_pubkey, amount_lamports);
+    let transfer_instruction = crate::system_instruction::transfer(&from_pubkey, &to_pubkey, amount_lamports);
     let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[]);
 
     // Compute budget instructions
@@ -645,8 +653,9 @@ async fn build_transfer_sol(
     );
 
     // Create transaction message with fresh blockhash
+    let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        &[compute_limit, unit_price, transfer_instruction, memo_ix],
         Some(&from_pubkey),
         &blockhash,
     );
@@ -737,8 +746,8 @@ async fn build_transfer_usdt(
     };
 
     // Get associated token accounts
-    let from_ata = get_associated_token_address(&from_pubkey, &usdt_mint);
-    let to_ata = get_associated_token_address(&to_pubkey, &usdt_mint);
+    let from_ata = get_associated_token_address(&utils::to_spl_pubkey(&from_pubkey), &utils::to_spl_pubkey(&usdt_mint));
+    let to_ata = get_associated_token_address(&utils::to_spl_pubkey(&to_pubkey), &utils::to_spl_pubkey(&usdt_mint));
 
     // Parse amount (USDT has 6 decimals)
     let amount_ui = match payload.amount.parse::<f64>() {
@@ -756,20 +765,23 @@ async fn build_transfer_usdt(
     // Build instructions
     let compute_limit = ComputeBudgetInstruction::set_compute_unit_limit(300_000);
     let unit_price = ComputeBudgetInstruction::set_compute_unit_price(100);
+    let from_spl = utils::to_spl_pubkey(&from_pubkey);
     let transfer_instruction = token_instruction::transfer(
         &spl_token::id(),
         &from_ata,
         &to_ata,
-        &from_pubkey,
-        &[],
+        &from_spl,
+        &[&from_spl],
         amount,
     ).unwrap();
 
     let memo_text = build_memo("USDT", &payload.from_address, &payload.to_address, amount, &payload.yid, payload.notes.as_deref()).unwrap_or_default();
-    let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[&from_pubkey]);
+    let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[&from_spl]);
 
+    let transfer_ix = utils::instruction_from_spl(&transfer_instruction);
+    let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction, memo_instruction],
+        &[compute_limit, unit_price, transfer_ix, memo_ix],
         Some(&from_pubkey),
         &blockhash,
     );
@@ -806,6 +818,155 @@ async fn build_transfer_usdt(
     .into_response()
 }
 
+// x402 Purch endpoint: call Purch x402 URL with order payload; x402-rs handles 402 → pay → retry; return final response.
+async fn x402_purch(
+    State(_state): State<AppState>,
+    Json(payload): Json<X402PurchRequest>,
+) -> Response {
+    use reqwest::Client;
+    use std::sync::Arc;
+    use x402_chain_solana::v1_solana_exact::client::V1SolanaExactClient;
+    use x402_chain_solana::v2_solana_exact::client::V2SolanaExactClient;
+    use x402_reqwest::{ReqwestWithPayments, ReqwestWithPaymentsBuild, X402Client};
+
+    let network = if payload.network.is_empty() {
+        "mainnet-beta".to_string()
+    } else {
+        payload.network.clone()
+    };
+
+    // Load keypair from ~/.fuego/wallet.json (required for signing x402 payment)
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
+    let wallet_path = home_dir.join(".fuego").join("wallet.json");
+    let wallet_content = match fs::read_to_string(&wallet_path) {
+        Ok(c) => c,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "No wallet found at ~/.fuego/wallet.json. Run 'fuego create' first."
+            }))
+            .into_response();
+        }
+    };
+    let wallet: WalletStore = match serde_json::from_str(&wallet_content) {
+        Ok(w) => w,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Invalid wallet.json: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    if wallet.private_key.len() < 32 {
+        return Json(json!({
+            "success": false,
+            "error": "Wallet private key must be at least 32 bytes"
+        }))
+        .into_response();
+    }
+    let mut secret_arr = [0u8; 32];
+    secret_arr.copy_from_slice(&wallet.private_key[..32]);
+
+    let keypair = solana_sdk::signer::keypair::Keypair::new_from_array(secret_arr);
+
+    let rpc_url = format!("https://api.{}.solana.com", network);
+    let rpc = solana_client::nonblocking::rpc_client::RpcClient::new(rpc_url);
+    let rpc_arc = Arc::new(rpc);
+    let keypair_arc = Arc::new(keypair);
+
+    // Register both V1 and V2 Solana exact clients so we match whatever Purch.xyz returns (V1 or V2 402 format)
+    let x402_client = X402Client::new()
+        .register(V1SolanaExactClient::new(keypair_arc.clone(), rpc_arc.clone()))
+        .register(V2SolanaExactClient::new(keypair_arc, rpc_arc));
+
+    let http_client = match Client::builder().with_payments(x402_client).build() {
+        Ok(c) => c,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to build HTTP client: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    let payer_address = payload.payer_address.as_deref().unwrap_or(wallet.address.as_str());
+    let mut physical_address = serde_json::Map::new();
+    physical_address.insert("name".to_string(), serde_json::Value::String(payload.name.clone()));
+    physical_address.insert("line1".to_string(), serde_json::Value::String(payload.address_line1.clone()));
+    physical_address.insert("city".to_string(), serde_json::Value::String(payload.city.clone()));
+    physical_address.insert("state".to_string(), serde_json::Value::String(payload.state.clone()));
+    physical_address.insert("postalCode".to_string(), serde_json::Value::String(payload.postal_code.clone()));
+    physical_address.insert("country".to_string(), serde_json::Value::String(if payload.country.is_empty() { "US".to_string() } else { payload.country.clone() }));
+    if let Some(ref line2) = payload.address_line2 {
+        if !line2.is_empty() {
+            physical_address.insert("line2".to_string(), serde_json::Value::String(line2.clone()));
+        }
+    }
+
+    let order_body = json!({
+        "email": payload.email,
+        "payerAddress": payer_address,
+        "productUrl": payload.product_url,
+        "physicalAddress": physical_address
+    });
+    let body_bytes = match serde_json::to_vec(&order_body) {
+        Ok(b) => b,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to serialize order body: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    let response = match http_client
+        .post(&payload.url)
+        .header("Content-Type", "application/json")
+        .body(body_bytes)
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Request failed: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    let status = response.status();
+    let body: String = match response.text().await {
+        Ok(b) => b,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to read response: {}", e)
+            }))
+            .into_response();
+        }
+    };
+
+    let body_json: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(j) => j,
+        Err(_) => serde_json::Value::String(body),
+    };
+
+    let success = status.is_success();
+    Json(json!({
+        "success": success,
+        "status": status.as_u16(),
+        "data": body_json,
+        "x402_note": if success { "Payment accepted; order response above." } else { "Request completed; check status and data." }
+    }))
+    .into_response()
+}
+
 async fn submit_transaction(
     State(_state): State<AppState>,
     Json(payload): Json<SubmitTransactionRequest>,
@@ -826,7 +987,7 @@ async fn submit_transaction(
     };
 
     // Deserialize transaction (already signed by agent with correct blockhash)
-    let transaction: Transaction = match bincode::deserialize(&tx_bytes) {
+    let transaction: ClientTransaction = match bincode::deserialize(&tx_bytes) {
         Ok(tx) => tx,
         Err(_) => {
             return Json(json!({
@@ -885,7 +1046,7 @@ async fn submit_versioned_transaction(
     };
 
     // Deserialize as VersionedTransaction (Jupiter format)
-    let versioned_transaction: VersionedTransaction = match bincode::deserialize(&tx_bytes) {
+    let versioned_transaction: ClientVersionedTransaction = match bincode::deserialize(&tx_bytes) {
         Ok(tx) => tx,
         Err(_) => {
             return Json(json!({
@@ -975,11 +1136,11 @@ async fn get_all_transactions(
 
 
 async fn get_wallet_address() -> Response {
-    // Try to load wallet address from ~/.fuego/config.json or ~/.fuego/wallet.json
+    // Try to load wallet address from ~/.fuego/wallet-config.json
     let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
     
-    // Try config.json first (has walletAddress field)
-    let config_path = home_dir.join(".fuego").join("config.json");
+    // Try wallet-config.json first (has walletAddress field)
+    let config_path = home_dir.join(".fuego").join("wallet-config.json");
     if config_path.exists() {
         if let Ok(config_content) = fs::read_to_string(&config_path) {
             if let Ok(config) = serde_json::from_str::<WalletConfig>(&config_content) {
@@ -988,14 +1149,14 @@ async fn get_wallet_address() -> Response {
                     "data": {
                         "address": config.wallet_address,
                         "network": config.network,
-                        "source": "config"
+                        "source": "wallet-config"
                     }
                 })).into_response();
             }
         }
     }
     
-    // Fallback to wallet.json (has address field)
+    // Fallback to legacy wallet.json (has address field)
     let wallet_path = home_dir.join(".fuego").join("wallet.json");
     if wallet_path.exists() {
         if let Ok(wallet_content) = fs::read_to_string(&wallet_path) {
@@ -1015,7 +1176,7 @@ async fn get_wallet_address() -> Response {
     // No wallet found
     Json(json!({
         "success": false,
-        "error": "No wallet found. Initialize with: node src/cli/init.ts"
+        "error": "No wallet found. Initialize with: fuego create"
     })).into_response()
 }
 
@@ -1045,6 +1206,7 @@ async fn main() {
         .route("/build-transfer-usdc", post(build_transfer_usdc))
         .route("/build-transfer-sol", post(build_transfer_sol))
         .route("/build-transfer-usdt", post(build_transfer_usdt))
+        .route("/x402-purch", post(x402_purch))
         .route("/submit-transaction", post(submit_transaction))
         .route("/submit-versioned-transaction", post(submit_versioned_transaction))
         .layer(cors)
@@ -1065,6 +1227,7 @@ async fn main() {
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
     println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)");
+    println!("    POST /x402-purch - x402 Purch: call Purch URL with order payload (Solana); returns final response");
     println!("    POST /submit-transaction - Broadcast signed transaction (legacy format - fuego transfers)");
     println!("    POST /submit-versioned-transaction - Broadcast VersionedTransaction (Jupiter/v0 format)");
     println!("  HISTORY:");
