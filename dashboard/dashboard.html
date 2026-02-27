@@ -556,7 +556,7 @@
             try {
                 // Fetch prices alongside balances
                 const [solRes, usdcRes, usdtRes, prices] = await Promise.all([
-                    fetch(`${API_URL}/get-sol-balance`, {
+                    fetch(`${API_URL}/sol-balance`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ network: NETWORK, address })

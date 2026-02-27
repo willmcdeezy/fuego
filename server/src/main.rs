@@ -75,7 +75,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::CommitmentConfig;
 use solana_sdk::message::Message;
 use solana_sdk::transaction::Transaction;
-use solana_sdk::system_instruction;
+use solana_system_interface::instruction::transfer;
 use solana_transaction::versioned::VersionedTransaction as ClientVersionedTransaction;
 use solana_transaction::Transaction as ClientTransaction;
 use spl_associated_token_account::get_associated_token_address;
@@ -640,8 +640,12 @@ async fn build_transfer_sol(
         }
     };
 
-    // Build instructions using native SDK system_instruction
-    let transfer_instruction = solana_sdk::system_instruction::transfer(&from_pubkey, &to_pubkey, amount_lamports);
+    // Build instructions using solana_system_interface
+    let transfer_instruction = transfer(
+        &from_pubkey,
+        &to_pubkey,
+        amount_lamports
+    );
     let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[]);
 
     // Compute budget instructions
