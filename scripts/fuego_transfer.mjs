@@ -4,9 +4,9 @@
  * Uses @solana/kit: decode server tx → set fee payer signer → sign → serialize → submit.
  *
  * Usage:
- *   node fuego_transfer.mjs --from <ADDRESS> --to <ADDRESS> --amount <AMOUNT> [--token USDC|SOL|USDT] [--network mainnet-beta] [--server URL] [--wallet path]
+ *   node fuego_transfer.mjs --to <ADDRESS> --amount <AMOUNT> [--token USDC|SOL|USDT] [--network mainnet-beta] [--server URL]
  *
- * Wallet is always at ~/.fuego/wallet.json unless overridden by --wallet.
+ * Wallet is always loaded from ~/.fuego/wallet.json and ~/.fuego/wallet-config.json
  * Environment: FUEGO_SERVER (default http://127.0.0.1:8080), FUEGO_NETWORK (default mainnet-beta).
  */
 
@@ -76,6 +76,41 @@ async function loadWalletFromFile(walletPath) {
   }
 
   return createKeyPairSignerFromBytes(bytes);
+}
+
+/**
+ * Get wallet address from wallet-config.json (same as Python script did).
+ * @returns {string} Wallet address
+ */
+function getWalletAddress() {
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const configPath = path.join(homeDir, '.fuego', 'wallet-config.json');
+  
+  if (fs.existsSync(configPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.publicKey) {
+        return config.publicKey;
+      }
+    } catch (e) {
+      console.warn("⚠️  Could not read wallet-config.json:", e.message);
+    }
+  }
+  
+  // Fallback: derive from wallet.json
+  const walletPath = path.join(homeDir, '.fuego', 'wallet.json');
+  if (fs.existsSync(walletPath)) {
+    try {
+      const walletData = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+      if (walletData.address) {
+        return walletData.address;
+      }
+    } catch (e) {
+      console.warn("⚠️  Could not read wallet.json:", e.message);
+    }
+  }
+  
+  throw new Error("Could not find wallet address. Run 'fuego create' first.");
 }
 
 /**
@@ -163,23 +198,31 @@ async function submitTransaction(serverUrl, network, signedTxBase64) {
 
 async function main() {
   const args = parseArgs();
-  const fromAddr = args.from;
   const toAddr = args.to;
   const amount = args.amount;
   const token = (args.token || "USDC").toUpperCase();
   const network = args.network || process.env.FUEGO_NETWORK || "mainnet-beta";
   const serverUrl =
     args.server || process.env.FUEGO_SERVER || "http://127.0.0.1:8080";
-  const walletPath = args.wallet || "~/.fuego/wallet.json";
+  const walletPath = "~/.fuego/wallet.json";
 
-  if (!fromAddr || !toAddr || !amount) {
+  if (!toAddr || !amount) {
     console.error(
-      "Usage: node fuego_transfer.mjs --from <ADDRESS> --to <ADDRESS> --amount <AMOUNT> [--token USDC|SOL|USDT] [--network] [--server] [--wallet]",
+      "Usage: node fuego_transfer.mjs --to <ADDRESS> --amount <AMOUNT> [--token USDC|SOL|USDT] [--network] [--server]",
     );
     process.exit(1);
   }
   if (!["USDC", "SOL", "USDT"].includes(token)) {
     console.error("--token must be USDC, SOL, or USDT");
+    process.exit(1);
+  }
+
+  // Get from address from wallet (same as Python script)
+  let fromAddr;
+  try {
+    fromAddr = getWalletAddress();
+  } catch (e) {
+    console.error("❌ Failed to get wallet address:", e.message);
     process.exit(1);
   }
 
