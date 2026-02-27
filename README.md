@@ -89,7 +89,7 @@ Your agent is now ready to query balances, build transactions, and submit to the
        ↓ Unsigned Transaction
 🦞 Agent (via CLI)
   • Loads ~/.fuego/wallet.json (simple JSON, no password!)
-  • Signs transaction locally with solders library
+  • Signs transaction locally
        ↓ Signed Transaction
 🔥 Fuego Server (localhost:8080)
   • POST /submit-transaction (broadcast to Solana)
@@ -129,7 +129,7 @@ Your agent is now ready to query balances, build transactions, and submit to the
 ### 🛠️ Developer Experience
 - **Rust server** - Single binary, no dependencies  
 - **TypeScript SDK** - Type-safe client library
-- **Python scripts** - Ready-to-use transaction tools
+- **JavaScript/Node.js scripts** - Ready-to-use transaction tools
 - **Comprehensive docs** - Every endpoint documented  
 - **Error handling** - Clear error messages for debugging
 
@@ -149,8 +149,7 @@ Your agent is now ready to query balances, build transactions, and submit to the
 
 ### Prerequisites
 - [Rust](https://rustup.rs/) (1.85+) - **Required for macOS compatibility**
-- [Node.js](https://nodejs.org/) (18+)  
-- [Python](https://python.org/) (3.8+)
+- [Node.js](https://nodejs.org/) (18+)
 
 ### Setup
 ```bash
@@ -170,7 +169,7 @@ cd server && cargo build --release
 - **Server**: Rust + Axum + Solana SDK
 - **Client**: The CLI (`fuego-cli`)
 - **Dashboard**: Vanilla HTML/CSS/JS (zero dependencies)
-- **Scripts**: Python + solders + requests
+- **Scripts**: Node.js + @solana/kit
 
 ---
 
