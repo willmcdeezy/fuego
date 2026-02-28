@@ -1029,7 +1029,7 @@
                     }
                     
                     html += `
-                        <div class="tx-item">
+                        <a href="https://solscan.io/tx/${tx.signature}" target="_blank" class="tx-item" style="text-decoration: none; color: inherit; display: flex;">
                             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                                 ${largeTokenIcon}
                                 <div class="tx-info">
@@ -1048,11 +1048,8 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <span style="font-weight: 600; color: var(--accent-orange); font-size: 13px; white-space: nowrap;">${directionLabel}</span>
-                                <div class="tx-link">
-                                    <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
-                                </div>
                             </div>
-                        </div>
+                        </a>
                     `;
                 } else {
                     // Regular transaction - simple styling
@@ -1068,7 +1065,7 @@
                     const statusText = isFinalized ? 'Finalized' : 'Pending';
                     
                     html += `
-                        <div class="tx-item">
+                        <a href="https://solscan.io/tx/${tx.signature}" target="_blank" class="tx-item" style="text-decoration: none; color: inherit; display: flex;">
                             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                                 <span style="font-size: 20px;">📄</span>
                                 <div class="tx-info">
@@ -1081,10 +1078,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="tx-link">
-                                <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
-                            </div>
-                        </div>
+                        </a>
                     `;
                 }
             });
