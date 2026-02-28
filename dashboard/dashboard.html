@@ -811,7 +811,7 @@
                             </div>
                             <div class="token-amount">
                                 <div class="token-balance">${token.ui_amount.toLocaleString()}</div>
-                                ${usdValue ? `<div class="token-usd" style="font-size: 11px; color: var(--text-secondary);">${usdValue}</div>` : ''}
+                                ${usdValue ? `<div class="token-usd" style="font-size: 11px; color: var(--text-secondary);">${usdValue}</div>` : '<div class="token-usd" style="font-size: 11px; color: var(--text-secondary); opacity: 0.6;">Price unavailable</div>'}
                             </div>
                         </div>
                     `;
