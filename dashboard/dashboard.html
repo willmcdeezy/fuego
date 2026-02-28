@@ -791,9 +791,14 @@
                     return;
                 }
                 
+                // Fetch prices for all tokens by mint address
+                const tokenPrices = await fetchTokenPricesByMint(otherTokens.map(t => t.mint));
+                
                 let html = '';
                 otherTokens.forEach(token => {
                     const displaySymbol = token.symbol || 'Unknown';
+                    const price = tokenPrices?.[token.mint?.toLowerCase()]?.usd;
+                    const usdValue = price ? (token.ui_amount * price).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }) : null;
                     
                     html += `
                         <div class="token-item">
@@ -806,6 +811,7 @@
                             </div>
                             <div class="token-amount">
                                 <div class="token-balance">${token.ui_amount.toLocaleString()}</div>
+                                ${usdValue ? `<div class="token-usd" style="font-size: 11px; color: var(--text-secondary);">${usdValue}</div>` : ''}
                             </div>
                         </div>
                     `;
@@ -823,7 +829,7 @@
             return `${addr.substring(0, 4)}…${addr.substring(addr.length - 4)}`;
         }
 
-        // Fetch token prices from CoinGecko
+        // Fetch token prices from CoinGecko by token ID
         async function fetchTokenPrices() {
             try {
                 const ids = Object.values(TOKEN_IDS).join(',');
@@ -832,6 +838,27 @@
                 return await response.json();
             } catch (error) {
                 console.log('CoinGecko error:', error);
+                return null;
+            }
+        }
+
+        // Fetch token prices from CoinGecko by mint address (contract address)
+        async function fetchTokenPricesByMint(mintAddresses) {
+            if (!mintAddresses || mintAddresses.length === 0) return null;
+            
+            try {
+                // Join mint addresses with commas
+                const addresses = mintAddresses.join(',');
+                const url = `${COINGECKO_API}/simple/token_price/solana?contract_addresses=${addresses}&vs_currencies=usd`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    console.log('Token price fetch failed:', response.status);
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.log('CoinGecko token price error:', error);
                 return null;
             }
         }
