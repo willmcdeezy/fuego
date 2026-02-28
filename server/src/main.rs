@@ -1149,6 +1149,121 @@ async fn get_all_transactions(
 // Issue: Standard ATA derivation doesn't work for Token-2022
 // Solution: Enumerate all token accounts owned by wallet and find by mint
 
+// Token metadata for known tokens
+fn get_token_symbol(mint: &str) -> Option<&str> {
+    match mint {
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" => Some("USDC"),
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB" => Some("USDT"),
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263" => Some("BONK"),
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN" => Some("JUP"),
+        _ => None,
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct GetTokensRequest {
+    address: String,
+    network: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TokenAccountInfo {
+    mint: String,
+    symbol: Option<String>,
+    amount: String,
+    decimals: u8,
+    ui_amount: f64,
+    token_account: String,
+}
+
+async fn get_tokens(
+    Json(payload): Json<GetTokensRequest>,
+) -> Response {
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url);
+
+    let wallet_pubkey = match string_to_pub_key(&payload.address) {
+        Ok(pubkey) => pubkey,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid wallet address"
+            })).into_response();
+        }
+    };
+
+    // Get SOL balance
+    let sol_balance = match rpc.get_balance(&wallet_pubkey) {
+        Ok(lamports) => lamports,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to get SOL balance: {}", e)
+            })).into_response();
+        }
+    };
+
+    // Get all token accounts
+    let token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".parse().unwrap();
+    let token_accounts = match rpc.get_token_accounts_by_owner(
+        &wallet_pubkey,
+        solana_client::rpc_request::TokenAccountsFilter::ProgramId(token_program),
+    ) {
+        Ok(accounts) => accounts,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to get token accounts: {}", e)
+            })).into_response();
+        }
+    };
+
+    // Parse token accounts
+    let mut tokens: Vec<TokenAccountInfo> = Vec::new();
+    
+    for account in token_accounts {
+        // Match on UiAccountData enum to get parsed JSON
+        let parsed_data = match &account.account.data {
+            solana_account_decoder::UiAccountData::Json(parsed) => Some(parsed),
+            _ => None,
+        };
+        
+        if let Some(ui_account) = parsed_data {
+            if let Ok(parsed) = serde_json::from_value::<serde_json::Value>(ui_account.parsed.clone()) {
+                if let Some(info) = parsed.get("info") {
+                    let mint = info.get("mint").and_then(|m| m.as_str()).unwrap_or("").to_string();
+                    let amount = info.get("tokenAmount").and_then(|t| t.get("amount")).and_then(|a| a.as_str()).unwrap_or("0").to_string();
+                    let decimals = info.get("tokenAmount").and_then(|t| t.get("decimals")).and_then(|d| d.as_u64()).unwrap_or(0) as u8;
+                    let ui_amount = info.get("tokenAmount").and_then(|t| t.get("uiAmount")).and_then(|u| u.as_f64()).unwrap_or(0.0);
+                    
+                    tokens.push(TokenAccountInfo {
+                        mint: mint.clone(),
+                        symbol: get_token_symbol(&mint).map(|s| s.to_string()),
+                        amount,
+                        decimals,
+                        ui_amount,
+                        token_account: account.pubkey.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort by UI amount (descending)
+    tokens.sort_by(|a, b| b.ui_amount.partial_cmp(&a.ui_amount).unwrap_or(std::cmp::Ordering::Equal));
+
+    Json(json!({
+        "success": true,
+        "data": {
+            "wallet": payload.address,
+            "network": payload.network,
+            "sol_balance": sol_balance as f64 / 1_000_000_000.0,
+            "sol_lamports": sol_balance,
+            "tokens": tokens,
+            "token_count": tokens.len()
+        }
+    })).into_response()
+}
 
 async fn get_wallet_address() -> Response {
     // Try to load wallet address from ~/.fuego/wallet-config.json
@@ -1217,6 +1332,7 @@ async fn main() {
         .route("/usdc-balance", post(get_usdc_balance))
         .route("/usdt-balance", post(get_usdt_balance))
         .route("/all-transactions", post(get_all_transactions))
+        .route("/tokens", post(get_tokens))
         // TRANSFER endpoints
         .route("/build-transfer-usdc", post(build_transfer_usdc))
         .route("/build-transfer-sol", post(build_transfer_sol))
@@ -1238,6 +1354,7 @@ async fn main() {
     println!("    POST /sol-balance - Get SOL balance");
     println!("    POST /usdc-balance - Get USDC balance");
     println!("    POST /usdt-balance - Get USDT balance");
+    println!("    POST /tokens - Get all SPL token accounts with balances");
     println!("  BUILD TRANSFERS:");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs in script)");
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs in script)");
