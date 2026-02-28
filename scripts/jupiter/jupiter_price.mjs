@@ -132,8 +132,39 @@ async function main() {
   try {
     const data = await fetchUltraOrder(config.jupiterKey, params);
     
-    console.log('📈 Order Response:');
-    console.log(JSON.stringify(data, null, 2));
+    console.log('📈 Order Details:');
+    console.log(`   Input: ${formatAmount(data.inputMint, data.inAmount)}`);
+    console.log(`   Output: ${formatAmount(data.outputMint, data.outAmount)}`);
+    console.log(`   Minimum Output: ${formatAmount(data.outputMint, data.otherAmountThreshold)}`);
+    console.log(`   Slippage: ${(data.slippageBps / 100).toFixed(2)}%`);
+    console.log(`   Price Impact: ${(data.priceImpactPct * 100).toFixed(4)}%`);
+    
+    console.log('\n💰 Pricing Info:');
+    console.log(`   Input USD Value: $${parseFloat(data.inUsdValue).toFixed(6)}`);
+    console.log(`   Output USD Value: $${parseFloat(data.outUsdValue).toFixed(6)}`);
+    console.log(`   Swap USD Value: $${parseFloat(data.swapUsdValue).toFixed(6)}`);
+    console.log(`   Price Impact: ${data.priceImpact.toFixed(4)}%`);
+    
+    console.log('\n📊 Route Plan:');
+    if (data.routePlan && data.routePlan.length > 0) {
+      data.routePlan.forEach((step, idx) => {
+        console.log(`   Step ${idx + 1}: ${step.swapInfo.label} (${step.percent}%)`);
+        console.log(`     ${formatAmount(step.swapInfo.inputMint, step.swapInfo.inAmount)} → ${formatAmount(step.swapInfo.outputMint, step.swapInfo.outAmount)}`);
+      });
+    }
+    
+    console.log('\n💸 Fees:');
+    console.log(`   Platform Fee: ${data.platformFee.feeBps / 100}%`);
+    console.log(`   Fee Mint: ${data.feeMint === TOKEN_MINTS['SOL'] ? 'SOL' : data.feeMint}`);
+    console.log(`   Signature Fee: ${data.signatureFeeLamports} lamports`);
+    console.log(`   Prioritization Fee: ${data.prioritizationFeeLamports} lamports`);
+    
+    console.log('\n📋 Additional Info:');
+    console.log(`   Router: ${data.router}`);
+    console.log(`   Mode: ${data.mode}`);
+    console.log(`   Gasless: ${data.gasless}`);
+    console.log(`   Request ID: ${data.requestId}`);
+    console.log(`   Total Time: ${data.totalTime}ms`);
     
     console.log('\n✅ Order fetched successfully');
     
