@@ -623,7 +623,8 @@
         const TOKEN_IDS = {
             'SOL': 'solana',
             'USDC': 'usd-coin',
-            'USDT': 'tether'
+            'USDT': 'tether',
+            'BONK': 'bonk'
         };
 
         async function loadDashboard() {
@@ -792,12 +793,14 @@
                 }
                 
                 // Fetch prices for all tokens by mint address
-                const tokenPrices = await fetchTokenPricesByMint(otherTokens.map(t => t.mint));
+                const tokenPrices = await fetchTokenPricesByMint(otherTokens);
                 
                 let html = '';
                 otherTokens.forEach(token => {
                     const displaySymbol = token.symbol || 'Unknown';
-                    const price = tokenPrices?.[token.mint?.toLowerCase()]?.usd;
+                    // Try lowercase mint first, then uppercase
+                    let priceData = tokenPrices?.[token.mint?.toLowerCase()] || tokenPrices?.[token.mint];
+                    const price = priceData?.usd;
                     const usdValue = price ? (token.ui_amount * price).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }) : null;
                     
                     html += `
@@ -843,24 +846,64 @@
         }
 
         // Fetch token prices from CoinGecko by mint address (contract address)
-        async function fetchTokenPricesByMint(mintAddresses) {
-            if (!mintAddresses || mintAddresses.length === 0) return null;
+        async function fetchTokenPricesByMint(tokens) {
+            if (!tokens || tokens.length === 0) return null;
             
+            const prices = {};
+            const mintAddresses = tokens.map(t => t.mint);
+            
+            // Try contract address endpoint first
             try {
-                // Join mint addresses with commas
                 const addresses = mintAddresses.join(',');
                 const url = `${COINGECKO_API}/simple/token_price/solana?contract_addresses=${addresses}&vs_currencies=usd`;
                 
+                console.log('Fetching contract prices for:', addresses);
+                
                 const response = await fetch(url);
-                if (!response.ok) {
-                    console.log('Token price fetch failed:', response.status);
-                    return null;
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Contract price data:', data);
+                    Object.assign(prices, data);
+                } else {
+                    console.log('Contract price fetch failed:', response.status);
                 }
-                return await response.json();
             } catch (error) {
-                console.log('CoinGecko token price error:', error);
-                return null;
+                console.log('Contract price error:', error);
             }
+            
+            // Fallback: Try by symbol for known tokens that didn't get a price
+            try {
+                const missingPriceTokens = tokens.filter(t => {
+                    const mintLower = t.mint?.toLowerCase();
+                    const mintUpper = t.mint;
+                    return TOKEN_IDS[t.symbol] && !prices[mintLower] && !prices[mintUpper];
+                });
+                
+                if (missingPriceTokens.length > 0) {
+                    const ids = missingPriceTokens.map(t => TOKEN_IDS[t.symbol]).join(',');
+                    const url = `${COINGECKO_API}/simple/price?ids=${ids}&vs_currencies=usd`;
+                    
+                    console.log('Fetching symbol prices for:', ids);
+                    
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Symbol price data:', data);
+                        
+                        // Map symbol-based prices back to mint addresses
+                        missingPriceTokens.forEach(token => {
+                            const id = TOKEN_IDS[token.symbol];
+                            if (data[id]?.usd) {
+                                prices[token.mint.toLowerCase()] = { usd: data[id].usd };
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.log('Symbol price error:', error);
+            }
+            
+            return prices;
         }
 
         function formatUSDPrice(price) {
