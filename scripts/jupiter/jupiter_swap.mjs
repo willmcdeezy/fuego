@@ -12,7 +12,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 const CONFIG_PATH = join(homedir(), '.fuego', 'config.json');
-const WALLET_PATH = join(homedir(), '.fuego', 'wallet.json');
+const WALLET_INFO_PATH = join(homedir(), '.fuego', 'wallet-config.json');
 const JUPITER_ULTRA_ORDER_URL = 'https://api.jup.ag/ultra/v1/order';
 
 // Token mint addresses
@@ -36,10 +36,10 @@ function loadConfig() {
 
 function loadWalletAddress() {
   try {
-    const wallet = JSON.parse(readFileSync(WALLET_PATH, 'utf8'));
-    return wallet.address;
+    const wallet = JSON.parse(readFileSync(WALLET_INFO_PATH, 'utf8'));
+    return wallet.publicKey;
   } catch (err) {
-    console.error('❌ Failed to load wallet:', err.message);
+    console.error('❌ Failed to load wallet info:', err.message);
     process.exit(1);
   }
 }
