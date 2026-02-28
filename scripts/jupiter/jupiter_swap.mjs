@@ -187,7 +187,7 @@ async function submitTransaction(rpcUrl, signedBase64Tx) {
         signedBase64Tx,
         {
           encoding: 'base64',
-          skipPreflight: false,
+          skipPreflight: true,  // SKIP PREFLIGHT
           preflightCommitment: 'confirmed'
         }
       ]
