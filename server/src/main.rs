@@ -646,6 +646,16 @@ async fn build_transfer_sol(
         &to_pubkey,
         amount_lamports
     );
+    
+    // DEBUG: Print transfer instruction details
+    eprintln!("DEBUG: Transfer instruction:");
+    eprintln!("  program_id: {:?}", transfer_instruction.program_id);
+    eprintln!("  accounts: {:?}", transfer_instruction.accounts);
+    eprintln!("  data: {:?}", transfer_instruction.data);
+    eprintln!("  data bytes: {:?}", transfer_instruction.data.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" "));
+    eprintln!("  amount_lamports: {}", amount_lamports);
+    eprintln!("  from: {:?}", from_pubkey);
+    eprintln!("  to: {:?}", to_pubkey);
     let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[]);
 
     // Compute budget instructions
