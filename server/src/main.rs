@@ -36,30 +36,30 @@ mod compute_budget {
 }
 
 /// System program instructions (solana_sdk 4.x no longer exposes system_instruction module).
-mod system_instruction {
-    use solana_sdk::instruction::{AccountMeta, Instruction};
-    use solana_sdk::pubkey::Pubkey;
-    use std::sync::OnceLock;
+// mod system_instruction {
+//     use solana_sdk::instruction::{AccountMeta, Instruction};
+//     use solana_sdk::pubkey::Pubkey;
+//     use std::sync::OnceLock;
 
-    fn system_program_id() -> &'static Pubkey {
-        static ID: OnceLock<Pubkey> = OnceLock::new();
-        ID.get_or_init(|| "11111111111111111111111111111111".parse().unwrap())
-    }
+//     fn system_program_id() -> &'static Pubkey {
+//         static ID: OnceLock<Pubkey> = OnceLock::new();
+//         ID.get_or_init(|| "11111111111111111111111111111111".parse().unwrap())
+//     }
 
-    /// Transfer lamports from one account to another (system program).
-    pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, lamports: u64) -> Instruction {
-        let mut data = vec![2u8]; // SystemInstruction::Transfer discriminant
-        data.extend_from_slice(&lamports.to_le_bytes());
-        Instruction {
-            program_id: *system_program_id(),
-            accounts: vec![
-                AccountMeta::new(*from_pubkey, true),
-                AccountMeta::new(*to_pubkey, false),
-            ],
-            data,
-        }
-    }
-}
+//     /// Transfer lamports from one account to another (system program).
+//     pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, lamports: u64) -> Instruction {
+//         let mut data = vec![2u8]; // SystemInstruction::Transfer discriminant
+//         data.extend_from_slice(&lamports.to_le_bytes());
+//         Instruction {
+//             program_id: *system_program_id(),
+//             accounts: vec![
+//                 AccountMeta::new(*from_pubkey, true),
+//                 AccountMeta::new(*to_pubkey, false),
+//             ],
+//             data,
+//         }
+//     }
+// }
 
 use crate::compute_budget::ComputeBudgetInstruction;
 use axum::{
@@ -75,7 +75,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::CommitmentConfig;
 use solana_sdk::message::Message;
 use solana_sdk::transaction::Transaction;
-use crate::system_instruction::transfer;
+use solana_system_interface::instruction::transfer;
 use solana_transaction::versioned::VersionedTransaction as ClientVersionedTransaction;
 use solana_transaction::Transaction as ClientTransaction;
 use spl_associated_token_account::get_associated_token_address;
@@ -677,9 +677,9 @@ async fn build_transfer_sol(
     );
 
     // Create transaction message with fresh blockhash
-    // let memo_ix = utils::instruction_from_spl(&memo_instruction);
+    let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction],
+        &[compute_limit, unit_price, transfer_instruction, memo_ix],
         Some(&from_pubkey),
         &blockhash,
     );
