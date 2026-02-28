@@ -12,6 +12,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 const CONFIG_PATH = join(homedir(), '.fuego', 'config.json');
+const WALLET_PATH = join(homedir(), '.fuego', 'wallet.json');
 const JUPITER_ULTRA_ORDER_URL = 'https://api.jup.ag/ultra/v1/order';
 
 // Token mint addresses
@@ -29,6 +30,16 @@ function loadConfig() {
     return config;
   } catch (err) {
     console.error('❌ Failed to load config:', err.message);
+    process.exit(1);
+  }
+}
+
+function loadWalletAddress() {
+  try {
+    const wallet = JSON.parse(readFileSync(WALLET_PATH, 'utf8'));
+    return wallet.address;
+  } catch (err) {
+    console.error('❌ Failed to load wallet:', err.message);
     process.exit(1);
   }
 }
@@ -83,12 +94,13 @@ function formatAmount(mint, amount) {
   return amount;
 }
 
-async function fetchUltraOrder(apiKey, params) {
+async function fetchUltraOrder(apiKey, taker, params) {
   const queryString = new URLSearchParams({
     inputMint: params.inputMint,
     outputMint: params.outputMint,
     amount: params.amount,
-    slippageBps: params.slippageBps
+    slippageBps: params.slippageBps,
+    taker: taker
   }).toString();
   
   const url = `${JUPITER_ULTRA_ORDER_URL}?${queryString}`;
@@ -116,16 +128,18 @@ async function main() {
   console.log('🪐 Jupiter Ultra Swap - Order Fetch\n');
   
   const config = loadConfig();
+  const taker = loadWalletAddress();
   const params = parseArgs();
   
   console.log(`📊 Fetching order:`);
+  console.log(`   Taker: ${taker}`);
   console.log(`   Input: ${params.inputMint === TOKEN_MINTS['USDC'] ? 'USDC' : params.inputMint}`);
   console.log(`   Output: ${params.outputMint === TOKEN_MINTS['SOL'] ? 'SOL' : params.outputMint}`);
   console.log(`   Amount: ${formatAmount(params.inputMint, params.amount)}`);
   console.log(`   Slippage: ${(parseInt(params.slippageBps) / 100).toFixed(2)}%\n`);
   
   try {
-    const data = await fetchUltraOrder(config.jupiterKey, params);
+    const data = await fetchUltraOrder(config.jupiterKey, taker, params);
     
     console.log('\n📄 RAW RESPONSE:');
     console.log(JSON.stringify(data, null, 2));
