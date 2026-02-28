@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /**
- * Jupiter Ultra Order Script
- * Fetches executable orders from Jupiter Ultra API
+ * Jupiter Price Quote Script (Regular API)
+ * Fetches swap quotes from Jupiter Regular API
  * 
  * Usage:
  *   node jupiter_price.mjs --input SOL --output USDC --amount 0.01
- *   node jupiter_price.mjs --input So11111111111111111111111111111111111111112 --output EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v --amount 10000000
  */
 
 import { readFileSync } from 'fs';
@@ -13,7 +12,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 const CONFIG_PATH = join(homedir(), '.fuego', 'config.json');
-const JUPITER_ULTRA_ORDER_URL = 'https://api.jup.ag/ultra/v1/order';
+const JUPITER_QUOTE_URL = 'https://api.jup.ag/swap/v1/quote';
 
 // Token mint addresses
 const TOKEN_MINTS = {
@@ -83,7 +82,7 @@ function formatAmount(mint, amount) {
   return amount;
 }
 
-async function fetchUltraOrder(apiKey, params) {
+async function fetchQuote(apiKey, params) {
   const queryString = new URLSearchParams({
     inputMint: params.inputMint,
     outputMint: params.outputMint,
@@ -91,7 +90,7 @@ async function fetchUltraOrder(apiKey, params) {
     slippageBps: params.slippageBps
   }).toString();
   
-  const url = `${JUPITER_ULTRA_ORDER_URL}?${queryString}`;
+  const url = `${JUPITER_QUOTE_URL}?${queryString}`;
   console.log(`📡 Fetching: ${url}\n`);
   
   const response = await fetch(url, {
@@ -102,11 +101,6 @@ async function fetchUltraOrder(apiKey, params) {
   });
   
   console.log(`📊 Response Status: ${response.status} ${response.statusText}`);
-  console.log(`📋 Response Headers:`);
-  response.headers.forEach((value, key) => {
-    console.log(`  ${key}: ${value}`);
-  });
-  console.log();
   
   const data = await response.json();
   
@@ -118,21 +112,21 @@ async function fetchUltraOrder(apiKey, params) {
 }
 
 async function main() {
-  console.log('🪐 Jupiter Ultra Order\n');
+  console.log('🪐 Jupiter Quote (Regular API)\n');
   
   const config = loadConfig();
   const params = parseArgs();
   
-  console.log(`📊 Fetching order:`);
+  console.log(`📊 Fetching quote:`);
   console.log(`   Input: ${params.inputMint === TOKEN_MINTS['SOL'] ? 'SOL' : params.inputMint}`);
   console.log(`   Output: ${params.outputMint === TOKEN_MINTS['USDC'] ? 'USDC' : params.outputMint}`);
   console.log(`   Amount: ${formatAmount(params.inputMint, params.amount)}`);
   console.log(`   Slippage: ${(parseInt(params.slippageBps) / 100).toFixed(2)}%\n`);
   
   try {
-    const data = await fetchUltraOrder(config.jupiterKey, params);
+    const data = await fetchQuote(config.jupiterKey, params);
     
-    console.log('📈 Order Details:');
+    console.log('📈 Quote Details:');
     console.log(`   Input: ${formatAmount(data.inputMint, data.inAmount)}`);
     console.log(`   Output: ${formatAmount(data.outputMint, data.outAmount)}`);
     console.log(`   Minimum Output: ${formatAmount(data.outputMint, data.otherAmountThreshold)}`);
@@ -143,7 +137,6 @@ async function main() {
     console.log(`   Input USD Value: $${parseFloat(data.inUsdValue).toFixed(6)}`);
     console.log(`   Output USD Value: $${parseFloat(data.outUsdValue).toFixed(6)}`);
     console.log(`   Swap USD Value: $${parseFloat(data.swapUsdValue).toFixed(6)}`);
-    console.log(`   Price Impact: ${data.priceImpact.toFixed(4)}%`);
     
     console.log('\n📊 Route Plan:');
     if (data.routePlan && data.routePlan.length > 0) {
@@ -153,20 +146,7 @@ async function main() {
       });
     }
     
-    console.log('\n💸 Fees:');
-    console.log(`   Platform Fee: ${data.platformFee.feeBps / 100}%`);
-    console.log(`   Fee Mint: ${data.feeMint === TOKEN_MINTS['SOL'] ? 'SOL' : data.feeMint}`);
-    console.log(`   Signature Fee: ${data.signatureFeeLamports} lamports`);
-    console.log(`   Prioritization Fee: ${data.prioritizationFeeLamports} lamports`);
-    
-    console.log('\n📋 Additional Info:');
-    console.log(`   Router: ${data.router}`);
-    console.log(`   Mode: ${data.mode}`);
-    console.log(`   Gasless: ${data.gasless}`);
-    console.log(`   Request ID: ${data.requestId}`);
-    console.log(`   Total Time: ${data.totalTime}ms`);
-    
-    console.log('\n✅ Order fetched successfully');
+    console.log('\n✅ Quote fetched successfully');
     
   } catch (err) {
     console.error('\n❌ Failed to fetch order:', err.message);
