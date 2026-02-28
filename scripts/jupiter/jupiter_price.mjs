@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Jupiter Price Quote Script
- * Fetches swap quotes from Jupiter Ultra API with fallback to regular endpoint
+ * Jupiter Ultra Order Script
+ * Fetches executable orders from Jupiter Ultra API
  * 
  * Usage:
  *   node jupiter_price.mjs --input SOL --output USDC --amount 0.01
@@ -13,8 +13,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 const CONFIG_PATH = join(homedir(), '.fuego', 'config.json');
-const JUPITER_ULTRA_URL = 'https://api.jup.ag/ultra/v1/quote';
-const JUPITER_REGULAR_URL = 'https://api.jup.ag/swap/v1/quote';
+const JUPITER_ULTRA_ORDER_URL = 'https://api.jup.ag/ultra/v1/order';
 
 // Token mint addresses
 const TOKEN_MINTS = {
@@ -84,88 +83,62 @@ function formatAmount(mint, amount) {
   return amount;
 }
 
-async function fetchQuote(url, apiKey, params) {
-  const queryString = new URLSearchParams(params).toString();
-  const fullUrl = `${url}?${queryString}`;
+async function fetchUltraOrder(apiKey, params) {
+  const queryString = new URLSearchParams({
+    inputMint: params.inputMint,
+    outputMint: params.outputMint,
+    amount: params.amount,
+    slippageBps: params.slippageBps
+  }).toString();
   
-  const response = await fetch(fullUrl, {
+  const url = `${JUPITER_ULTRA_ORDER_URL}?${queryString}`;
+  console.log(`📡 Fetching: ${url}\n`);
+  
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       'x-api-key': apiKey
     }
   });
   
+  console.log(`📊 Response Status: ${response.status} ${response.statusText}`);
+  console.log(`📋 Response Headers:`);
+  response.headers.forEach((value, key) => {
+    console.log(`  ${key}: ${value}`);
+  });
+  console.log();
+  
+  const data = await response.json();
+  
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`${response.status}: ${error}`);
+    throw new Error(`${response.status}: ${JSON.stringify(data)}`);
   }
   
-  return await response.json();
-}
-
-async function getQuote(config, params) {
-  const apiKey = config.jupiterKey;
-  
-  if (!apiKey) {
-    throw new Error('No jupiterKey found in config');
-  }
-  
-  // Try Ultra first
-  try {
-    console.log('🚀 Trying Jupiter Ultra...');
-    const data = await fetchQuote(JUPITER_ULTRA_URL, apiKey, params);
-    console.log('✅ Ultra endpoint successful\n');
-    return { data, endpoint: 'ultra' };
-  } catch (ultraErr) {
-    console.log(`⚠️  Ultra failed: ${ultraErr.message}`);
-    console.log('🔄 Falling back to regular endpoint...\n');
-    
-    // Fallback to regular
-    try {
-      const data = await fetchQuote(JUPITER_REGULAR_URL, apiKey, params);
-      console.log('✅ Regular endpoint successful\n');
-      return { data, endpoint: 'regular' };
-    } catch (regularErr) {
-      throw new Error(`Both endpoints failed. Ultra: ${ultraErr.message}, Regular: ${regularErr.message}`);
-    }
-  }
+  return data;
 }
 
 async function main() {
-  console.log('🪐 Jupiter Price Quote\n');
+  console.log('🪐 Jupiter Ultra Order\n');
   
   const config = loadConfig();
   const params = parseArgs();
   
-  console.log(`📊 Fetching quote:`);
+  console.log(`📊 Fetching order:`);
   console.log(`   Input: ${params.inputMint === TOKEN_MINTS['SOL'] ? 'SOL' : params.inputMint}`);
   console.log(`   Output: ${params.outputMint === TOKEN_MINTS['USDC'] ? 'USDC' : params.outputMint}`);
   console.log(`   Amount: ${formatAmount(params.inputMint, params.amount)}`);
   console.log(`   Slippage: ${(parseInt(params.slippageBps) / 100).toFixed(2)}%\n`);
   
   try {
-    const { data, endpoint } = await getQuote(config, params);
+    const data = await fetchUltraOrder(config.jupiterKey, params);
     
-    console.log('📈 Quote Results:');
-    console.log(`   Endpoint Used: ${endpoint}`);
-    console.log(`   Input Amount: ${formatAmount(data.inputMint, data.inAmount)}`);
-    console.log(`   Output Amount: ${formatAmount(data.outputMint, data.outAmount)}`);
-    console.log(`   Minimum Output: ${formatAmount(data.outputMint, data.otherAmountThreshold)}`);
-    console.log(`   Price Impact: ${data.priceImpactPct}%`);
-    console.log(`   Slippage: ${(data.slippageBps / 100).toFixed(2)}%`);
-    console.log(`   USD Value: $${parseFloat(data.swapUsdValue).toFixed(4)}`);
+    console.log('📈 Order Response:');
+    console.log(JSON.stringify(data, null, 2));
     
-    if (data.routePlan && data.routePlan.length > 0) {
-      console.log(`   Route: ${data.routePlan.map(r => r.swapInfo.label).join(' → ')}`);
-    }
-    
-    console.log('\n✅ Quote fetched successfully');
-    
-    // Return data for potential programmatic use
-    process.exitCode = 0;
+    console.log('\n✅ Order fetched successfully');
     
   } catch (err) {
-    console.error('\n❌ Failed to fetch quote:', err.message);
+    console.error('\n❌ Failed to fetch order:', err.message);
     process.exit(1);
   }
 }
