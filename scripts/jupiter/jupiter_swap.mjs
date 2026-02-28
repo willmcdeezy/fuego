@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Jupiter Ultra Swap Script - DEBUG MODE
- * Fetches order and examines the transaction structure
+ * Jupiter Ultra Swap Script - FULL FLOW
+ * Gets order, signs transaction, and submits
  * 
  * Usage:
  *   node jupiter_swap.mjs --input USDC --output SOL --amount 10
@@ -10,9 +10,11 @@
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import nacl from 'tweetnacl';
 
 const CONFIG_PATH = join(homedir(), '.fuego', 'config.json');
 const WALLET_INFO_PATH = join(homedir(), '.fuego', 'wallet-config.json');
+const WALLET_PATH = join(homedir(), '.fuego', 'wallet.json');
 const JUPITER_ULTRA_ORDER_URL = 'https://api.jup.ag/ultra/v1/order';
 
 // Token mint addresses
@@ -40,6 +42,18 @@ function loadWalletAddress() {
     return wallet.publicKey;
   } catch (err) {
     console.error('❌ Failed to load wallet info:', err.message);
+    process.exit(1);
+  }
+}
+
+function loadWalletPrivateKey() {
+  try {
+    const wallet = JSON.parse(readFileSync(WALLET_PATH, 'utf8'));
+    const keypairBytes = new Uint8Array(wallet.privateKey);
+    // Return first 32 bytes (private key)
+    return keypairBytes.slice(0, 32);
+  } catch (err) {
+    console.error('❌ Failed to load wallet:', err.message);
     process.exit(1);
   }
 }
@@ -94,12 +108,14 @@ function formatAmount(mint, amount) {
 }
 
 async function fetchUltraOrder(apiKey, taker, params) {
+  // ALWAYS gasless=false for now
   const queryString = new URLSearchParams({
     inputMint: params.inputMint,
     outputMint: params.outputMint,
     amount: params.amount,
     slippageBps: params.slippageBps,
-    taker: taker
+    taker: taker,
+    gasless: 'false'
   }).toString();
   
   const url = `${JUPITER_ULTRA_ORDER_URL}?${queryString}`;
@@ -121,128 +137,78 @@ async function fetchUltraOrder(apiKey, taker, params) {
   return data;
 }
 
-function examineTransaction(base64Tx) {
-  console.log('\n🔍 Examining Transaction Structure...\n');
+async function signTransaction(base64Tx, privateKeyBytes) {
+  console.log('\n🔑 Signing transaction...');
   
-  // Decode base64 to bytes
+  // Create keypair from private key using tweetnacl
+  const keypair = nacl.sign.keyPair.fromSeed(privateKeyBytes);
+  console.log('✓ Keypair created');
+  
+  // Decode transaction
   const txBytes = Buffer.from(base64Tx, 'base64');
-  console.log(`📊 Transaction Size: ${txBytes.length} bytes`);
-  console.log(`📊 Transaction Length: ${base64Tx.length} chars (base64)`);
+  console.log(`✓ Transaction bytes: ${txBytes.length}`);
   
-  // First byte = number of signatures
-  const numSignatures = txBytes[0];
-  console.log(`\n📝 Signatures Count: ${numSignatures}`);
+  // Extract message (after signature placeholder)
+  // Format: [num_signatures (1 byte)] [signature (64 bytes)] [message]
+  const messageBytes = new Uint8Array(txBytes.slice(65));
+  console.log(`✓ Message bytes: ${messageBytes.length}`);
   
-  // Each signature is 64 bytes
-  let offset = 1;
-  const signatures = [];
+  // Sign the message with tweetnacl
+  const signature = nacl.sign.detached(messageBytes, keypair.secretKey);
+  console.log(`✓ Signature created (${signature.length} bytes)`);
   
-  for (let i = 0; i < numSignatures; i++) {
-    const sigBytes = txBytes.slice(offset, offset + 64);
-    // Check if signature is all zeros (placeholder)
-    const isPlaceholder = sigBytes.every(b => b === 0);
-    signatures.push({
-      index: i,
-      offset: offset,
-      isPlaceholder: isPlaceholder,
-      hex: sigBytes.toString('hex').slice(0, 32) + '...'
-    });
-    offset += 64;
-  }
+  // Reconstruct signed transaction
+  // [1 byte: num sigs = 1] [64 bytes: signature] [message]
+  const signedTx = new Uint8Array(1 + 64 + messageBytes.length);
+  signedTx[0] = 1; // Number of signatures
+  signedTx.set(signature, 1);
+  signedTx.set(messageBytes, 65);
   
-  console.log(`\n✍️  Signatures:`);
-  signatures.forEach(sig => {
-    console.log(`   [${sig.index}] Offset ${sig.offset}: ${sig.isPlaceholder ? 'PLACEHOLDER (zeros)' : 'HAS DATA'}`);
-    console.log(`         First 16 bytes: ${sig.hex}`);
+  // Encode to base64
+  const signedBase64 = Buffer.from(signedTx).toString('base64');
+  console.log(`✓ Signed transaction: ${signedBase64.length} chars`);
+  
+  return signedBase64;
+}
+
+async function submitTransaction(rpcUrl, signedBase64Tx) {
+  console.log('\n📤 Submitting transaction to Solana...');
+  
+  const response = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'sendTransaction',
+      params: [
+        signedBase64Tx,
+        {
+          encoding: 'base64',
+          skipPreflight: false,
+          preflightCommitment: 'confirmed'
+        }
+      ]
+    })
   });
   
-  // After signatures comes the message
-  console.log(`\n📨 Message starts at byte: ${offset}`);
-  const messageBytes = txBytes.slice(offset);
-  console.log(`📨 Message size: ${messageBytes.length} bytes`);
+  const result = await response.json();
   
-  // Try to parse message header
-  // Message structure: 
-  // - Header (3 bytes): numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts
-  // - Account addresses (32 bytes each)
-  // - Recent blockhash (32 bytes)
-  // - Instructions...
-  
-  if (messageBytes.length >= 3) {
-    const numRequiredSignatures = messageBytes[0];
-    const numReadonlySigned = messageBytes[1];
-    const numReadonlyUnsigned = messageBytes[2];
-    
-    console.log(`\n📋 Message Header:`);
-    console.log(`   Required Signatures: ${numRequiredSignatures}`);
-    console.log(`   Read-only Signed: ${numReadonlySigned}`);
-    console.log(`   Read-only Unsigned: ${numReadonlyUnsigned}`);
-    
-    // Number of account addresses (varint)
-    let msgOffset = 3;
-    const accountCount = messageBytes[msgOffset++];
-    console.log(`\n👥 Account Addresses Count: ${accountCount}`);
-    
-    // Read account addresses (32 bytes each)
-    const accounts = [];
-    for (let i = 0; i < accountCount && msgOffset + 32 <= messageBytes.length; i++) {
-      const addrBytes = messageBytes.slice(msgOffset, msgOffset + 32);
-      accounts.push({
-        index: i,
-        base58: addrBytes.toString('hex').slice(0, 8) + '...' // Simplified, not real base58
-      });
-      msgOffset += 32;
-    }
-    
-    accounts.slice(0, 5).forEach(acc => {
-      console.log(`   [${acc.index}] ${acc.base58}`);
-    });
-    if (accounts.length > 5) {
-      console.log(`   ... and ${accounts.length - 5} more`);
-    }
-    
-    // Recent blockhash (32 bytes)
-    if (msgOffset + 32 <= messageBytes.length) {
-      const blockhashBytes = messageBytes.slice(msgOffset, msgOffset + 32);
-      const blockhashHex = blockhashBytes.toString('hex');
-      console.log(`\n🔗 Recent Blockhash (hex): ${blockhashHex.slice(0, 16)}...${blockhashHex.slice(-16)}`);
-      console.log(`   Blockhash offset: ${offset + msgOffset}`);
-      msgOffset += 32;
-    }
-    
-    // Instructions count
-    if (msgOffset < messageBytes.length) {
-      const instructionCount = messageBytes[msgOffset++];
-      console.log(`\n⚙️  Instructions Count: ${instructionCount}`);
-    }
+  if (result.error) {
+    throw new Error(`RPC Error: ${JSON.stringify(result.error)}`);
   }
   
-  // Print raw first 100 bytes in hex for manual inspection
-  console.log(`\n🐛 Raw Bytes (first 100):`);
-  const hexDump = txBytes.slice(0, 100).toString('hex').match(/.{1,2}/g).join(' ');
-  console.log(`   ${hexDump}`);
-  
-  // Print byte breakdown
-  console.log(`\n📐 Byte Layout:`);
-  console.log(`   [0]        : ${txBytes[0]} (num signatures)`);
-  if (numSignatures > 0) {
-    console.log(`   [1-64]     : Signature #1 (${signatures[0]?.isPlaceholder ? 'placeholder' : 'populated'})`);
-  }
-  console.log(`   [${offset}+]   : Message data`);
-  
-  return {
-    numSignatures,
-    signatures,
-    messageOffset: offset,
-    messageSize: messageBytes.length
-  };
+  return result.result;
 }
 
 async function main() {
-  console.log('🪐 Jupiter Ultra Swap - DEBUG MODE\n');
+  console.log('🪐 Jupiter Ultra Swap\n');
   
   const config = loadConfig();
   const taker = loadWalletAddress();
+  const privateKey = loadWalletPrivateKey();
   const params = parseArgs();
   
   console.log(`📊 Swap Details:`);
@@ -250,10 +216,11 @@ async function main() {
   console.log(`   Input: ${params.inputMint === TOKEN_MINTS['USDC'] ? 'USDC' : params.inputMint}`);
   console.log(`   Output: ${params.outputMint === TOKEN_MINTS['SOL'] ? 'SOL' : params.outputMint}`);
   console.log(`   Amount: ${formatAmount(params.inputMint, params.amount)}`);
-  console.log(`   Slippage: ${(parseInt(params.slippageBps) / 100).toFixed(2)}%\n`);
+  console.log(`   Slippage: ${(parseInt(params.slippageBps) / 100).toFixed(2)}%`);
+  console.log(`   Gasless: false (hardcoded)\n`);
   
   try {
-    // Step 1: Fetch order from Jupiter Ultra
+    // Step 1: Fetch order
     console.log('📥 Step 1: Fetching order from Jupiter Ultra...');
     const order = await fetchUltraOrder(config.jupiterKey, taker, params);
     
@@ -262,57 +229,28 @@ async function main() {
     console.log(`   Output: ${formatAmount(order.outputMint, order.outAmount)}`);
     console.log(`   USD Value: $${parseFloat(order.swapUsdValue).toFixed(4)}`);
     console.log(`   Request ID: ${order.requestId}`);
+    console.log(`   Transaction: ${order.transaction ? 'Present' : 'MISSING'}`);
     
     if (!order.transaction) {
       throw new Error('No transaction in order response');
     }
     
-    console.log(`   Transaction: Present (${order.transaction.length} chars)\n`);
+    // Step 2: Sign transaction
+    const signedTx = await signTransaction(order.transaction, privateKey);
     
-    // Step 2: Examine the transaction
-    const txInfo = examineTransaction(order.transaction);
+    // Step 3: Submit
+    console.log('\n🚀 Step 3: Submitting...');
+    const signature = await submitTransaction(config.rpcUrl, signedTx);
     
-    console.log('\n📋 Summary:');
-    console.log(`   - Transaction has ${txInfo.numSignatures} signature slot(s)`);
-    console.log(`   - Signatures are ${txInfo.signatures.every(s => s.isPlaceholder) ? 'ALL PLACEHOLDERS (need signing)' : 'PARTIALLY SIGNED'}`);
-    console.log(`   - Message starts at byte ${txInfo.messageOffset}`);
-    console.log(`   - Message size: ${txInfo.messageSize} bytes`);
-    
-    if (txInfo.signatures.every(s => s.isPlaceholder)) {
-      console.log('\n💡 This transaction needs to be signed before submission.');
-    } else {
-      console.log('\n⚠️  Some signatures already present - check if it needs additional signing.');
-    }
-    
-    // Save transaction to file for further inspection
-    const fs = await import('fs');
-    const txFile = '/tmp/jupiter_tx_debug.bin';
-    fs.writeFileSync(txFile, Buffer.from(order.transaction, 'base64'));
-    console.log(`\n💾 Transaction saved to: ${txFile}`);
-    console.log(`   You can inspect with: xxd ${txFile} | head -20`);
-    
-    console.log('\n✅ Debug complete');
-    
-    // SIGNING CODE COMMENTED OUT FOR NOW
-    /*
-    // Step 3: Sign the transaction (COMMENTED OUT)
-    console.log('\n🔑 Step 3: Signing transaction...');
-    // const signedTx = await signTransactionWithKit(order.transaction, keypair);
-    
-    // Step 4: Submit to Fuego (COMMENTED OUT)
-    console.log('\n🚀 Step 4: Submitting to Fuego...');
-    // const network = config.netowrk || 'mainnet-beta';
-    // const result = await submitToFuego(signedTx, network);
-    
-    console.log('\n✅ Swap submitted successfully!');
-    console.log(`🔗 Signature: ${result.signature}`);
-    console.log(`🌐 Explorer: ${result.explorer_link}`);
-    */
+    console.log('\n✅ SWAP SUCCESSFUL!');
+    console.log(`🔗 Signature: ${signature}`);
+    console.log(`🌐 Explorer: https://solscan.io/tx/${signature}`);
+    console.log(`\n💰 Swapped ${formatAmount(order.inputMint, order.inAmount)} → ${formatAmount(order.outputMint, order.outAmount)}`);
     
   } catch (err) {
-    console.error('\n❌ Debug failed:', err.message);
+    console.error('\n❌ Swap failed:', err.message);
     if (err.stack) {
-      console.error('Stack:', err.stack);
+      console.error('\nStack:', err.stack);
     }
     process.exit(1);
   }
