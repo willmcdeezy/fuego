@@ -11,6 +11,9 @@
   </pre>
   <h3>🔥🦞 Agentic Solana Wallet 🦞🔥</h3>
   <p>Zero friction. Maximum agent autonomy.</p>
+
+  [![version](https://img.shields.io/badge/version-1.3.1-blue.svg)](./package.json)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
 **The first Solana wallet designed FOR autonomous agents. No passwords, no prompts, no friction. Just instant transaction signing and submission.**

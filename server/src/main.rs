@@ -36,30 +36,30 @@ mod compute_budget {
 }
 
 /// System program instructions (solana_sdk 4.x no longer exposes system_instruction module).
-mod system_instruction {
-    use solana_sdk::instruction::{AccountMeta, Instruction};
-    use solana_sdk::pubkey::Pubkey;
-    use std::sync::OnceLock;
+// mod system_instruction {
+//     use solana_sdk::instruction::{AccountMeta, Instruction};
+//     use solana_sdk::pubkey::Pubkey;
+//     use std::sync::OnceLock;
 
-    fn system_program_id() -> &'static Pubkey {
-        static ID: OnceLock<Pubkey> = OnceLock::new();
-        ID.get_or_init(|| "11111111111111111111111111111111".parse().unwrap())
-    }
+//     fn system_program_id() -> &'static Pubkey {
+//         static ID: OnceLock<Pubkey> = OnceLock::new();
+//         ID.get_or_init(|| "11111111111111111111111111111111".parse().unwrap())
+//     }
 
-    /// Transfer lamports from one account to another (system program).
-    pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, lamports: u64) -> Instruction {
-        let mut data = vec![2u8]; // SystemInstruction::Transfer discriminant
-        data.extend_from_slice(&lamports.to_le_bytes());
-        Instruction {
-            program_id: *system_program_id(),
-            accounts: vec![
-                AccountMeta::new(*from_pubkey, true),
-                AccountMeta::new(*to_pubkey, false),
-            ],
-            data,
-        }
-    }
-}
+//     /// Transfer lamports from one account to another (system program).
+//     pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, lamports: u64) -> Instruction {
+//         let mut data = vec![2u8]; // SystemInstruction::Transfer discriminant
+//         data.extend_from_slice(&lamports.to_le_bytes());
+//         Instruction {
+//             program_id: *system_program_id(),
+//             accounts: vec![
+//                 AccountMeta::new(*from_pubkey, true),
+//                 AccountMeta::new(*to_pubkey, false),
+//             ],
+//             data,
+//         }
+//     }
+// }
 
 use crate::compute_budget::ComputeBudgetInstruction;
 use axum::{
@@ -75,6 +75,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::CommitmentConfig;
 use solana_sdk::message::Message;
 use solana_sdk::transaction::Transaction;
+use solana_system_interface::instruction::transfer;
 use solana_transaction::versioned::VersionedTransaction as ClientVersionedTransaction;
 use solana_transaction::Transaction as ClientTransaction;
 use spl_associated_token_account::get_associated_token_address;
@@ -268,7 +269,7 @@ async fn get_latest_hash(
     }
 }
 
-async fn get_balance(
+async fn get_sol_balance(
     State(_state): State<AppState>,
     Json(payload): Json<GetBalanceRequest>,
 ) -> Response {
@@ -639,8 +640,22 @@ async fn build_transfer_sol(
         }
     };
 
-    // Build instructions
-    let transfer_instruction = crate::system_instruction::transfer(&from_pubkey, &to_pubkey, amount_lamports);
+    // DEBUG: Check pubkey types
+    eprintln!("DEBUG: from_pubkey type check:");
+    eprintln!("  bytes: {:?}", from_pubkey.to_bytes());
+    eprintln!("  len: {}", from_pubkey.to_bytes().len());
+    
+    // Try converting to the format solana_system_interface expects
+    let from_bytes = from_pubkey.to_bytes();
+    let to_bytes = to_pubkey.to_bytes();
+    
+    // Build instructions using solana_system_interface with explicit bytes
+    let transfer_instruction = transfer(
+        &solana_sdk::pubkey::Pubkey::new_from_array(from_bytes),
+        &solana_sdk::pubkey::Pubkey::new_from_array(to_bytes),
+        amount_lamports
+    );
+    
     let memo_instruction = spl_memo::build_memo(memo_text.as_bytes(), &[]);
 
     // Compute budget instructions
@@ -1198,7 +1213,7 @@ async fn main() {
         .route("/wallet-address", get(get_wallet_address))
         // READ endpoints
         .route("/latest-hash", post(get_latest_hash))
-        .route("/balance", post(get_balance))
+        .route("/sol-balance", post(get_sol_balance))
         .route("/usdc-balance", post(get_usdc_balance))
         .route("/usdt-balance", post(get_usdt_balance))
         .route("/all-transactions", post(get_all_transactions))
@@ -1220,14 +1235,16 @@ async fn main() {
     println!("    GET  /network - Get default network");
     println!("    GET  /wallet-address - Get local wallet address");
     println!("    POST /latest-hash - Get latest blockhash");
-    println!("    POST /balance - Get SOL balance");
+    println!("    POST /sol-balance - Get SOL balance");
     println!("    POST /usdc-balance - Get USDC balance");
     println!("    POST /usdt-balance - Get USDT balance");
-    println!("  TRANSFER:");
-    println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs)");
-    println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs)");
-    println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs)");
-    println!("    POST /x402-purch - x402 Purch: call Purch URL with order payload (Solana); returns final response");
+    println!("  BUILD TRANSFERS:");
+    println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs in script)");
+    println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs in script)");
+    println!("    POST /build-transfer-usdt - Build unsigned USDT transfer (agent signs in script)");
+    println!("  X402:");
+    println!("    POST /x402-purch - x402 Purch: WIP -- call Purch URL with order payload (Solana); returns final response");
+    println!("  SUBMIT:");
     println!("    POST /submit-transaction - Broadcast signed transaction (legacy format - fuego transfers)");
     println!("    POST /submit-versioned-transaction - Broadcast VersionedTransaction (Jupiter/v0 format)");
     println!("  HISTORY:");
