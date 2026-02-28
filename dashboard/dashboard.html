@@ -554,61 +554,48 @@
             const container = document.getElementById('balances');
             
             try {
-                // Fetch prices alongside balances
-                const [solRes, usdcRes, usdtRes, prices] = await Promise.all([
-                    fetch(`${API_URL}/sol-balance`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ network: NETWORK, address })
-                    }),
-                    fetch(`${API_URL}/usdc-balance`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ network: NETWORK, address })
-                    }),
-                    fetch(`${API_URL}/usdt-balance`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ network: NETWORK, address })
-                    }),
-                    fetchTokenPrices()
-                ]);
-
-                const solData = await solRes.json();
-                const usdcData = await usdcRes.json();
-                const usdtData = await usdtRes.json();
-
-                let html = '';
-
-                if (solData.success && solData.data && solData.data.sol !== undefined) {
-                    const solAmount = solData.data.sol || 0;
-                    const solPrice = prices?.solana?.usd;
-                    const usdValue = solPrice ? formatUSDPrice(solAmount * solPrice) : '';
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
-                                SOL
-                            </div>
-                            <div class="balance-amount">${solAmount.toFixed(9)}</div>
-                            ${usdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdValue}</div>` : ''}
-                            <div class="balance-unit">Solana</div>
-                        </div>
-                    `;
-                } else {
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <span class="balance-label-dot dot-sol"></span>
-                                SOL
-                            </div>
-                            <div class="balance-amount">—</div>
-                            <div class="balance-unit">Error loading</div>
-                        </div>
-                    `;
+                // Single call to get all tokens and SOL balance
+                const tokensRes = await fetch(`${API_URL}/tokens`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ network: NETWORK, address })
+                });
+                
+                if (!tokensRes.ok) {
+                    throw new Error('Failed to fetch tokens');
                 }
-
-                const usdcAmount = (usdcData.success && usdcData.data?.ui_amount !== undefined) ? parseFloat(usdcData.data.ui_amount) : 0;
+                
+                const tokensData = await tokensRes.json();
+                
+                if (!tokensData.success || !tokensData.data) {
+                    throw new Error('Invalid tokens response');
+                }
+                
+                const { sol_balance, tokens } = tokensData.data;
+                
+                // Fetch prices for USD values
+                const prices = await fetchTokenPrices();
+                
+                let html = '';
+                
+                // SOL Balance
+                const solPrice = prices?.solana?.usd;
+                const solUsdValue = solPrice ? formatUSDPrice(sol_balance * solPrice) : '';
+                html += `
+                    <div class="balance-item">
+                        <div class="balance-label">
+                            <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                            SOL
+                        </div>
+                        <div class="balance-amount">${sol_balance.toFixed(9)}</div>
+                        ${solUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${solUsdValue}</div>` : ''}
+                        <div class="balance-unit">Solana</div>
+                    </div>
+                `;
+                
+                // Find USDC in tokens array (return 0 if not found)
+                const usdcToken = tokens.find(t => t.symbol === 'USDC');
+                const usdcAmount = usdcToken ? usdcToken.ui_amount : 0;
                 const usdcPrice = prices?.['usd-coin']?.usd;
                 const usdcUsdValue = usdcPrice ? formatUSDPrice(usdcAmount * usdcPrice) : '';
                 html += `
@@ -622,8 +609,10 @@
                         <div class="balance-unit">USD Coin</div>
                     </div>
                 `;
-
-                const usdtAmount = (usdtData.success && usdtData.data?.ui_amount !== undefined) ? parseFloat(usdtData.data.ui_amount) : 0;
+                
+                // Find USDT in tokens array (return 0 if not found)
+                const usdtToken = tokens.find(t => t.symbol === 'USDT');
+                const usdtAmount = usdtToken ? usdtToken.ui_amount : 0;
                 const usdtPrice = prices?.tether?.usd;
                 const usdtUsdValue = usdtPrice ? formatUSDPrice(usdtAmount * usdtPrice) : '';
                 html += `
