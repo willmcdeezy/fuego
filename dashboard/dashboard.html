@@ -446,10 +446,10 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 12px 14px;
+            padding: 10px 14px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             gap: 12px;
             transition: background 0.15s;
         }
@@ -467,16 +467,24 @@
             font-weight: 600;
             font-size: 14px;
             color: var(--text-primary);
+            margin-bottom: 4px;
         }
 
         .token-mint {
             font-size: 10px;
             color: var(--text-secondary);
             font-family: 'Monaco', 'Menlo', monospace;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
         }
 
         .token-amount {
             text-align: right;
+            flex-shrink: 0;
+            padding-top: 2px;
         }
 
         .token-balance {
@@ -782,22 +790,19 @@
                 
                 let html = '';
                 otherTokens.forEach(token => {
-                    const shortMint = `${token.mint.substring(0, 4)}…${token.mint.substring(token.mint.length - 4)}`;
                     const displaySymbol = token.symbol || 'Unknown';
-                    const icon = getTokenIcon(token.symbol, '16px');
                     
                     html += `
                         <div class="token-item">
-                            <div class="token-info">
-                                <div class="token-icon">${icon}</div>
-                                <div class="token-details">
-                                    <div class="token-symbol">${displaySymbol}</div>
-                                    <div class="token-mint" title="${token.mint}">${shortMint}</div>
+                            <div class="token-main">
+                                <div class="token-symbol">${displaySymbol}</div>
+                                <div class="token-mint">
+                                    ${token.mint}
+                                    <button onclick="copyMintAddress('${token.mint}')" style="background: none; border: none; cursor: pointer; padding: 2px 4px; margin-left: 4px; font-size: 12px;" title="Copy mint address">📋</button>
                                 </div>
                             </div>
                             <div class="token-amount">
                                 <div class="token-balance">${token.ui_amount.toLocaleString()}</div>
-                                <div class="token-value">${token.decimals} decimals</div>
                             </div>
                         </div>
                     `;
@@ -1097,6 +1102,18 @@
                     btn.textContent = original;
                     btn.classList.remove('copied');
                 }, 2000);
+            });
+        }
+
+        function copyMintAddress(mint) {
+            navigator.clipboard.writeText(mint).then(() => {
+                // Show a quick notification
+                const btn = event.target;
+                const original = btn.textContent;
+                btn.textContent = '✓';
+                setTimeout(() => {
+                    btn.textContent = original;
+                }, 1000);
             });
         }
 
