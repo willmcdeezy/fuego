@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Jupiter Ultra Swap Script
- * Gets order, signs transaction with @solana/kit, and submits to Fuego endpoint
+ * Jupiter Ultra Swap Script - DEBUG MODE
+ * Fetches order and examines the transaction structure
  * 
  * Usage:
  *   node jupiter_swap.mjs --input USDC --output SOL --amount 10
@@ -10,18 +10,10 @@
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import {
-  createKeyPairFromPrivateKeyBytes,
-  createSignerFromKeyPair
-} from '@solana/kit';
 
 const CONFIG_PATH = join(homedir(), '.fuego', 'config.json');
 const WALLET_INFO_PATH = join(homedir(), '.fuego', 'wallet-config.json');
-const WALLET_PATH = join(homedir(), '.fuego', 'wallet.json');
 const JUPITER_ULTRA_ORDER_URL = 'https://api.jup.ag/ultra/v1/order';
-
-// Fuego server endpoint
-const FUEGO_SERVER_URL = 'http://127.0.0.1:8080';
 
 // Token mint addresses
 const TOKEN_MINTS = {
@@ -48,18 +40,6 @@ function loadWalletAddress() {
     return wallet.publicKey;
   } catch (err) {
     console.error('❌ Failed to load wallet info:', err.message);
-    process.exit(1);
-  }
-}
-
-function loadWalletKeypair() {
-  try {
-    const wallet = JSON.parse(readFileSync(WALLET_PATH, 'utf8'));
-    const keypairBytes = new Uint8Array(wallet.privateKey);
-    const privateKeyBytes = keypairBytes.slice(0, 32);
-    return privateKeyBytes; // Return raw bytes, create keypair async later
-  } catch (err) {
-    console.error('❌ Failed to load wallet keypair:', err.message);
     process.exit(1);
   }
 }
@@ -141,69 +121,128 @@ async function fetchUltraOrder(apiKey, taker, params) {
   return data;
 }
 
-async function signTransactionWithKit(base64Tx, privateKeyBytes) {
-  console.log('\n🔑 Signing transaction with @solana/kit...');
+function examineTransaction(base64Tx) {
+  console.log('\n🔍 Examining Transaction Structure...\n');
   
-  // Create keypair from private key bytes (returns a Promise)
-  const keypair = await createKeyPairFromPrivateKeyBytes(privateKeyBytes);
-  console.log('   Keypair created');
+  // Decode base64 to bytes
+  const txBytes = Buffer.from(base64Tx, 'base64');
+  console.log(`📊 Transaction Size: ${txBytes.length} bytes`);
+  console.log(`📊 Transaction Length: ${base64Tx.length} chars (base64)`);
   
-  // Create signer from keypair
-  const signer = await createSignerFromKeyPair(keypair);
-  console.log(`   Signer: ${signer.address}`);
+  // First byte = number of signatures
+  const numSignatures = txBytes[0];
+  console.log(`\n📝 Signatures Count: ${numSignatures}`);
   
-  // Decode base64 transaction to bytes using Node Buffer
-  const wireTxBytes = Buffer.from(base64Tx, 'base64');
-  console.log(`   Transaction bytes: ${wireTxBytes.length}`);
+  // Each signature is 64 bytes
+  let offset = 1;
+  const signatures = [];
   
-  // Sign using the signer's signMessages method
-  const signatures = await signer.signMessages([new Uint8Array(wireTxBytes)]);
-  const signature = signatures[0];
-  console.log(`   Signature created`);
-  
-  // Construct the signed transaction:
-  // Format: [num_signatures (1 byte)] [signature (64 bytes)] [message (rest)]
-  const signedTxBytes = new Uint8Array(1 + 64 + wireTxBytes.length);
-  signedTxBytes[0] = 1; // Number of signatures
-  signedTxBytes.set(signature, 1);
-  signedTxBytes.set(new Uint8Array(wireTxBytes), 65);
-  
-  // Encode back to base64 using Node Buffer
-  const signedBase64 = Buffer.from(signedTxBytes).toString('base64');
-  
-  console.log('✓ Transaction signed and serialized');
-  return signedBase64;
-}
-
-async function submitToFuego(signedBase64Tx, network) {
-  console.log('\n📤 Submitting to Fuego versioned transaction endpoint...');
-  
-  const response = await fetch(`${FUEGO_SERVER_URL}/submit-versioned-transaction`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      transaction: signedBase64Tx,
-      network: network
-    })
-  });
-  
-  const result = await response.json();
-  
-  if (!result.success) {
-    throw new Error(`Fuego submission failed: ${result.error}`);
+  for (let i = 0; i < numSignatures; i++) {
+    const sigBytes = txBytes.slice(offset, offset + 64);
+    // Check if signature is all zeros (placeholder)
+    const isPlaceholder = sigBytes.every(b => b === 0);
+    signatures.push({
+      index: i,
+      offset: offset,
+      isPlaceholder: isPlaceholder,
+      hex: sigBytes.toString('hex').slice(0, 32) + '...'
+    });
+    offset += 64;
   }
   
-  return result.data;
+  console.log(`\n✍️  Signatures:`);
+  signatures.forEach(sig => {
+    console.log(`   [${sig.index}] Offset ${sig.offset}: ${sig.isPlaceholder ? 'PLACEHOLDER (zeros)' : 'HAS DATA'}`);
+    console.log(`         First 16 bytes: ${sig.hex}`);
+  });
+  
+  // After signatures comes the message
+  console.log(`\n📨 Message starts at byte: ${offset}`);
+  const messageBytes = txBytes.slice(offset);
+  console.log(`📨 Message size: ${messageBytes.length} bytes`);
+  
+  // Try to parse message header
+  // Message structure: 
+  // - Header (3 bytes): numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts
+  // - Account addresses (32 bytes each)
+  // - Recent blockhash (32 bytes)
+  // - Instructions...
+  
+  if (messageBytes.length >= 3) {
+    const numRequiredSignatures = messageBytes[0];
+    const numReadonlySigned = messageBytes[1];
+    const numReadonlyUnsigned = messageBytes[2];
+    
+    console.log(`\n📋 Message Header:`);
+    console.log(`   Required Signatures: ${numRequiredSignatures}`);
+    console.log(`   Read-only Signed: ${numReadonlySigned}`);
+    console.log(`   Read-only Unsigned: ${numReadonlyUnsigned}`);
+    
+    // Number of account addresses (varint)
+    let msgOffset = 3;
+    const accountCount = messageBytes[msgOffset++];
+    console.log(`\n👥 Account Addresses Count: ${accountCount}`);
+    
+    // Read account addresses (32 bytes each)
+    const accounts = [];
+    for (let i = 0; i < accountCount && msgOffset + 32 <= messageBytes.length; i++) {
+      const addrBytes = messageBytes.slice(msgOffset, msgOffset + 32);
+      accounts.push({
+        index: i,
+        base58: addrBytes.toString('hex').slice(0, 8) + '...' // Simplified, not real base58
+      });
+      msgOffset += 32;
+    }
+    
+    accounts.slice(0, 5).forEach(acc => {
+      console.log(`   [${acc.index}] ${acc.base58}`);
+    });
+    if (accounts.length > 5) {
+      console.log(`   ... and ${accounts.length - 5} more`);
+    }
+    
+    // Recent blockhash (32 bytes)
+    if (msgOffset + 32 <= messageBytes.length) {
+      const blockhashBytes = messageBytes.slice(msgOffset, msgOffset + 32);
+      const blockhashHex = blockhashBytes.toString('hex');
+      console.log(`\n🔗 Recent Blockhash (hex): ${blockhashHex.slice(0, 16)}...${blockhashHex.slice(-16)}`);
+      console.log(`   Blockhash offset: ${offset + msgOffset}`);
+      msgOffset += 32;
+    }
+    
+    // Instructions count
+    if (msgOffset < messageBytes.length) {
+      const instructionCount = messageBytes[msgOffset++];
+      console.log(`\n⚙️  Instructions Count: ${instructionCount}`);
+    }
+  }
+  
+  // Print raw first 100 bytes in hex for manual inspection
+  console.log(`\n🐛 Raw Bytes (first 100):`);
+  const hexDump = txBytes.slice(0, 100).toString('hex').match(/.{1,2}/g).join(' ');
+  console.log(`   ${hexDump}`);
+  
+  // Print byte breakdown
+  console.log(`\n📐 Byte Layout:`);
+  console.log(`   [0]        : ${txBytes[0]} (num signatures)`);
+  if (numSignatures > 0) {
+    console.log(`   [1-64]     : Signature #1 (${signatures[0]?.isPlaceholder ? 'placeholder' : 'populated'})`);
+  }
+  console.log(`   [${offset}+]   : Message data`);
+  
+  return {
+    numSignatures,
+    signatures,
+    messageOffset: offset,
+    messageSize: messageBytes.length
+  };
 }
 
 async function main() {
-  console.log('🪐 Jupiter Ultra Swap\n');
+  console.log('🪐 Jupiter Ultra Swap - DEBUG MODE\n');
   
   const config = loadConfig();
   const taker = loadWalletAddress();
-  const keypair = loadWalletKeypair();
   const params = parseArgs();
   
   console.log(`📊 Swap Details:`);
@@ -230,20 +269,48 @@ async function main() {
     
     console.log(`   Transaction: Present (${order.transaction.length} chars)\n`);
     
-    // Step 2: Sign the transaction
-    const signedTx = await signTransactionWithKit(order.transaction, keypair);
+    // Step 2: Examine the transaction
+    const txInfo = examineTransaction(order.transaction);
     
-    // Step 3: Submit to Fuego
-    console.log('\n🚀 Step 3: Submitting to Fuego...');
-    const network = config.netowrk || 'mainnet-beta';
-    const result = await submitToFuego(signedTx, network);
+    console.log('\n📋 Summary:');
+    console.log(`   - Transaction has ${txInfo.numSignatures} signature slot(s)`);
+    console.log(`   - Signatures are ${txInfo.signatures.every(s => s.isPlaceholder) ? 'ALL PLACEHOLDERS (need signing)' : 'PARTIALLY SIGNED'}`);
+    console.log(`   - Message starts at byte ${txInfo.messageOffset}`);
+    console.log(`   - Message size: ${txInfo.messageSize} bytes`);
+    
+    if (txInfo.signatures.every(s => s.isPlaceholder)) {
+      console.log('\n💡 This transaction needs to be signed before submission.');
+    } else {
+      console.log('\n⚠️  Some signatures already present - check if it needs additional signing.');
+    }
+    
+    // Save transaction to file for further inspection
+    const fs = await import('fs');
+    const txFile = '/tmp/jupiter_tx_debug.bin';
+    fs.writeFileSync(txFile, Buffer.from(order.transaction, 'base64'));
+    console.log(`\n💾 Transaction saved to: ${txFile}`);
+    console.log(`   You can inspect with: xxd ${txFile} | head -20`);
+    
+    console.log('\n✅ Debug complete');
+    
+    // SIGNING CODE COMMENTED OUT FOR NOW
+    /*
+    // Step 3: Sign the transaction (COMMENTED OUT)
+    console.log('\n🔑 Step 3: Signing transaction...');
+    // const signedTx = await signTransactionWithKit(order.transaction, keypair);
+    
+    // Step 4: Submit to Fuego (COMMENTED OUT)
+    console.log('\n🚀 Step 4: Submitting to Fuego...');
+    // const network = config.netowrk || 'mainnet-beta';
+    // const result = await submitToFuego(signedTx, network);
     
     console.log('\n✅ Swap submitted successfully!');
     console.log(`🔗 Signature: ${result.signature}`);
     console.log(`🌐 Explorer: ${result.explorer_link}`);
+    */
     
   } catch (err) {
-    console.error('\n❌ Swap failed:', err.message);
+    console.error('\n❌ Debug failed:', err.message);
     if (err.stack) {
       console.error('Stack:', err.stack);
     }
