@@ -658,9 +658,9 @@ async fn build_transfer_sol(
     );
 
     // Create transaction message with fresh blockhash
-    let memo_ix = utils::instruction_from_spl(&memo_instruction);
+    // let memo_ix = utils::instruction_from_spl(&memo_instruction);
     let message = Message::new_with_blockhash(
-        &[compute_limit, unit_price, transfer_instruction, memo_ix],
+        &[compute_limit, unit_price, transfer_instruction],
         Some(&from_pubkey),
         &blockhash,
     );
