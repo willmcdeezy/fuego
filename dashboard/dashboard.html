@@ -52,10 +52,25 @@
             line-height: 1.5;
         }
 
+        /* Sticky Footer */
+        .sticky-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            z-index: 100;
+        }
+
         .container {
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 20px 20px 60px 20px;
         }
 
         /* Header */
@@ -691,7 +706,7 @@
             </div>
         </div>
 
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color); text-align: center; font-size: 12px; color: var(--text-secondary);">
+        <div class="sticky-footer">
             Fuego • mainnet-beta
         </div>
     </div>
