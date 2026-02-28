@@ -640,10 +640,19 @@ async fn build_transfer_sol(
         }
     };
 
-    // Build instructions using solana_system_interface
+    // DEBUG: Check pubkey types
+    eprintln!("DEBUG: from_pubkey type check:");
+    eprintln!("  bytes: {:?}", from_pubkey.to_bytes());
+    eprintln!("  len: {}", from_pubkey.to_bytes().len());
+    
+    // Try converting to the format solana_system_interface expects
+    let from_bytes = from_pubkey.to_bytes();
+    let to_bytes = to_pubkey.to_bytes();
+    
+    // Build instructions using solana_system_interface with explicit bytes
     let transfer_instruction = transfer(
-        &from_pubkey,
-        &to_pubkey,
+        &solana_sdk::pubkey::Pubkey::new_from_array(from_bytes),
+        &solana_sdk::pubkey::Pubkey::new_from_array(to_bytes),
         amount_lamports
     );
     
