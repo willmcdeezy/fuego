@@ -381,29 +381,63 @@
             font-size: 13px;
         }
 
+        /* Segment Toggle for Tokens/Transactions */
+        .segment-control {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 16px;
+            gap: 4px;
+        }
+
+        .segment-btn {
+            flex: 1;
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .segment-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .segment-btn.active {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Content panels */
+        .content-panel {
+            display: none;
+        }
+
+        .content-panel.active {
+            display: block;
+        }
+
         /* Two Column Layout for Activity + Tokens */
         .dashboard-columns {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
+            display: block;
             margin-top: 32px;
         }
 
-        @media (max-width: 768px) {
-            .dashboard-columns {
-                grid-template-columns: 1fr;
-            }
-        }
-
         .column-section {
-            min-width: 0;
+            width: 100%;
         }
 
-        /* Token List Styles */
+        /* Token List Styles - Plain */
         .token-list {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
             max-height: 400px;
             overflow-y: auto;
         }
@@ -411,41 +445,21 @@
         .token-item {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 8px;
             padding: 12px 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 12px;
-            transition: all 0.2s;
+            transition: background 0.15s;
         }
 
         .token-item:hover {
-            border-color: var(--accent-purple);
             background: var(--bg-tertiary);
         }
 
-        .token-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .token-main {
             flex: 1;
-            min-width: 0;
-        }
-
-        .token-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--bg-tertiary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-
-        .token-details {
             min-width: 0;
         }
 
@@ -456,15 +470,13 @@
         }
 
         .token-mint {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-secondary);
             font-family: 'Monaco', 'Menlo', monospace;
-            word-break: break-all;
         }
 
         .token-amount {
             text-align: right;
-            flex-shrink: 0;
         }
 
         .token-balance {
@@ -473,8 +485,8 @@
             color: var(--text-primary);
         }
 
-        .token-value {
-            font-size: 12px;
+        .token-usd {
+            font-size: 11px;
             color: var(--text-secondary);
         }
 
@@ -540,7 +552,7 @@
         <!-- Error -->
         <div id="error"></div>
 
-        <!-- Balances -->
+        <!-- Balances (SOL + USDC only) -->
         <div class="section-title">Balances</div>
         <div class="balances-grid" id="balances">
             <div class="balance-item full-width loading">
@@ -549,35 +561,31 @@
             </div>
         </div>
 
-        <!-- Two Column Layout: Activity + Tokens -->
+        <!-- Full Width Section: Tokens / Transactions with Segment Toggle -->
         <div class="dashboard-columns">
-            <!-- Left Column: Recent Activity -->
             <div class="column-section">
-                <div class="section-title">
-                    <span>Recent Activity</span>
-                    <button class="refresh-btn" onclick="refreshTransactions()" id="refreshBtn">
-                        <span>Refresh</span>
-                    </button>
+                <div class="segment-control">
+                    <button class="segment-btn active" onclick="switchSegment('tokens')" id="btn-tokens">Tokens</button>
+                    <button class="segment-btn" onclick="switchSegment('transactions')" id="btn-transactions">Transactions</button>
                 </div>
                 
-                <div class="tx-list" id="txList">
-                    <div class="segment-loading">
-                        <div class="segment-spinner"></div>
-                        <span>Loading transactions...</span>
+                <!-- Tokens Panel -->
+                <div id="panel-tokens" class="content-panel active">
+                    <div class="token-list" id="tokenList">
+                        <div class="segment-loading">
+                            <div class="segment-spinner"></div>
+                            <span>Loading tokens...</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Right Column: All Tokens -->
-            <div class="column-section">
-                <div class="section-title">
-                    <span>All Tokens</span>
-                </div>
                 
-                <div class="token-list" id="tokenList">
-                    <div class="segment-loading">
-                        <div class="segment-spinner"></div>
-                        <span>Loading tokens...</span>
+                <!-- Transactions Panel -->
+                <div id="panel-transactions" class="content-panel">
+                    <div class="tx-list" id="txList">
+                        <div class="segment-loading">
+                            <div class="segment-spinner"></div>
+                            <span>Loading transactions...</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -697,14 +705,13 @@
                 const solPrice = prices?.solana?.usd;
                 const solUsdValue = solPrice ? formatUSDPrice(sol_balance * solPrice) : '';
                 html += `
-                    <div class="balance-item">
+                    <div class="balance-item" style="margin-bottom: 8px;">
                         <div class="balance-label">
                             <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
                             SOL
                         </div>
-                        <div class="balance-amount">${sol_balance.toFixed(9)}</div>
-                        ${solUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${solUsdValue}</div>` : ''}
-                        <div class="balance-unit">Solana</div>
+                        <div class="balance-amount">${sol_balance.toFixed(4)}</div>
+                        ${solUsdValue ? `<div class="balance-price" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${solUsdValue}</div>` : ''}
                     </div>
                 `;
                 
@@ -714,37 +721,36 @@
                 const usdcPrice = prices?.['usd-coin']?.usd;
                 const usdcUsdValue = usdcPrice ? formatUSDPrice(usdcAmount * usdcPrice) : '';
                 html += `
-                    <div class="balance-item">
+                    <div class="balance-item" style="margin-bottom: 8px;">
                         <div class="balance-label">
                             <img src="tokens/usdc.svg" alt="USDC" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
                             USDC
                         </div>
-                        <div class="balance-amount">$${usdcAmount.toFixed(6)}</div>
-                        ${usdcUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdcUsdValue}</div>` : ''}
-                        <div class="balance-unit">USD Coin</div>
-                    </div>
-                `;
-                
-                // Find USDT in tokens array (return 0 if not found)
-                const usdtToken = tokens.find(t => t.symbol === 'USDT');
-                const usdtAmount = usdtToken ? usdtToken.ui_amount : 0;
-                const usdtPrice = prices?.tether?.usd;
-                const usdtUsdValue = usdtPrice ? formatUSDPrice(usdtAmount * usdtPrice) : '';
-                html += `
-                    <div class="balance-item">
-                        <div class="balance-label">
-                            <img src="tokens/usdt.svg" alt="USDT" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
-                            USDT
-                        </div>
-                        <div class="balance-amount">$${usdtAmount.toFixed(6)}</div>
-                        ${usdtUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdtUsdValue}</div>` : ''}
-                        <div class="balance-unit">Tether</div>
+                        <div class="balance-amount">${usdcAmount.toFixed(2)}</div>
+                        ${usdcUsdValue ? `<div class="balance-price" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${usdcUsdValue}</div>` : ''}
                     </div>
                 `;
 
                 container.innerHTML = html;
             } catch (error) {
                 showError(`Failed to load balances: ${error.message}`);
+            }
+        }
+
+        // Segment toggle function
+        function switchSegment(segment) {
+            // Update buttons
+            document.querySelectorAll('.segment-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${segment}`).classList.add('active');
+            
+            // Update panels
+            document.querySelectorAll('.content-panel').forEach(panel => panel.classList.remove('active'));
+            document.getElementById(`panel-${segment}`).classList.add('active');
+            
+            // Load data if needed
+            const address = document.getElementById('address').textContent;
+            if (segment === 'transactions' && address && address !== 'Loading...') {
+                loadAllTransactions(address);
             }
         }
 
