@@ -16,9 +16,7 @@ metadata:
 
 # Fuego SKILL
 
-Local Solana agent wallet with sends, Jupiter swaps, and local infrastructure (scripts + server).
-
-The first Solana wallet designed FOR autonomous agents. Zero passwords, zero friction, maximum autonomy.
+Local Solana agent wallet with SOL, USDC, USDT transfers, Jupiter swaps, and local infrastructure (CLI + scripts + server).
 
 ## Quick Start
 
