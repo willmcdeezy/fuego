@@ -734,8 +734,121 @@
             'BONK': 'bonk'
         };
 
+        // Solana Token List cache
+        const TOKEN_LIST_CACHE_KEY = 'fuego_token_list';
+        const TOKEN_LIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+        let tokenListCache = null;
+
+        // Fetch and cache Solana token list
+        async function fetchTokenList() {
+            // Check localStorage cache first
+            const cached = localStorage.getItem(TOKEN_LIST_CACHE_KEY);
+            const cachedTime = localStorage.getItem(TOKEN_LIST_CACHE_KEY + '_time');
+            
+            if (cached && cachedTime) {
+                const age = Date.now() - parseInt(cachedTime);
+                if (age < TOKEN_LIST_CACHE_TTL) {
+                    console.log('Using cached token list');
+                    tokenListCache = JSON.parse(cached);
+                    return tokenListCache;
+                }
+            }
+
+            // Fetch fresh list
+            try {
+                console.log('Fetching Solana token list...');
+                const response = await fetch('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json');
+                if (!response.ok) throw new Error('Failed to fetch token list');
+                
+                const data = await response.json();
+                
+                // Only keep top 100 tokens to save localStorage space
+                if (data.tokens && data.tokens.length > 100) {
+                    data.tokens = data.tokens.slice(0, 100);
+                }
+                
+                tokenListCache = data;
+                
+                // Cache in localStorage
+                localStorage.setItem(TOKEN_LIST_CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(TOKEN_LIST_CACHE_KEY + '_time', Date.now().toString());
+                
+                console.log(`Loaded ${data.tokens?.length || 0} tokens (cached top 100)`);
+                return data;
+            } catch (error) {
+                console.error('Failed to fetch token list:', error);
+                return null;
+            }
+        }
+
+        // Lookup token symbol by mint address
+        function lookupTokenSymbol(mint) {
+            if (!tokenListCache || !tokenListCache.tokens) return null;
+            
+            const token = tokenListCache.tokens.find(t => 
+                t.address === mint || t.address.toLowerCase() === mint.toLowerCase()
+            );
+            
+            return token?.symbol || null;
+        }
+
+        // Hardcoded fallback for common tokens (instant load)
+        const FALLBACK_TOKEN_SYMBOLS = {
+            'So11111111111111111111111111111111111111112': 'SOL',
+            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
+            'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'USDT',
+            'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'BONK',
+            'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 'JUP',
+            '7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7AR': 'mSOL',
+            'bSo13r4TkiE4xumqJWryAufPpB52WAC7nDVRMVh5j57': 'bSOL',
+            'ZScHuTtqZukUraZ7E6jHs2kKLzFa7bQrZzRBFtEzqYM': 'stSOL',
+            'RLBxxFk7ANn3P2v2g76j6tW9Drp7JVn2RLp8RNcjc9Y': 'RLB',
+            'DUSTawucrLJ1oJDq6rUX1n4r8L9tzN4g4B7gWbV9X8L': 'DUST',
+            'kinXdEcpDQeHPEuQnqmUfgQWKd7oKBF5p9tX8vQG1qY': 'KIN',
+            '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R': 'RAY',
+            'MangoCzJ36AjZyKwVj3VnYU4GTonLKvZ6A8vGqBz9QZ': 'MNGO',
+            'ATLASXmbPQxBUYbxPsV97usA3fPQYEqzQBUHigFCusr9': 'ATLAS',
+            'POLISXxY4fhbBGyXw3wR8y9bW4w3wR8y9bW4w3wR8y9b': 'POLIS',
+            'FIDA2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzXzX': 'FIDA',
+            'SLND2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzXzX': 'SLND',
+            'STEP2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzX': 'STEP',
+            'SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuWJnqo': 'SRM',
+            'MER2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzXzX': 'MER',
+            'SAMO2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzX': 'SAMO',
+            'COPE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzX': 'COPE',
+            'TULIP2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'TULIP',
+            'ORCA2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'ORCA',
+            'AURY2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'AURY',
+            'GENE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'GENE',
+            'SBR2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'SBR',
+            'LQID2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'LQID',
+            'PRT2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'PRT',
+            'MNDE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'MNDE',
+            'STAKE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'STAKE',
+            'WBTC2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'WBTC',
+            'WETH2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'WETH'
+        };
+
+        // Get token symbol with fallback
+        function getTokenSymbol(mint) {
+            // First check hardcoded fallbacks (instant)
+            if (FALLBACK_TOKEN_SYMBOLS[mint]) {
+                return FALLBACK_TOKEN_SYMBOLS[mint];
+            }
+            
+            // Then check fetched token list
+            const fromList = lookupTokenSymbol(mint);
+            if (fromList) return fromList;
+            
+            // Return null if unknown
+            return null;
+        }
+
         async function loadDashboard() {
             try {
+                // Fetch token list in background (for symbol lookups)
+                fetchTokenList().catch(err => console.log('Token list fetch failed:', err));
+                
                 const address = await getWalletAddress();
                 document.getElementById('address').textContent = address;
                 await loadBalances(address);
