@@ -8,7 +8,7 @@ metadata:
     "openclaw":
       {
         "emoji": "🔥",
-        "requires": { "bins": ["curl", "node"], "env": [] },
+        "requires": { "bins": ["curl", "node", "cargo"], "env": [] },
         "optional": { "bins": [], "env": [] },
       },
   }
@@ -38,6 +38,9 @@ fuego create
 ```
 
 ### 3. Install Fuego Project
+
+**Prerequisites:** Rust 1.85+ and Cargo are required to build the server.
+
 ```bash
 # For OpenClaw agents (auto-detects ~/.openclaw/workspace)
 fuego install
