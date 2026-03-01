@@ -1,6 +1,6 @@
 ---
 name: fuego
-description: Agent-controlled Solana wallet with local signing, local server, local scripts. Everything runs on your machine. Built for autonomous agents that need frictionless Solana transactions.
+description: Local Agent Solana Wallet. Local signing, local server, local scripts. Everything on your machine.
 homepage: https://fuego.cash
 version: 1.4.0
 metadata:
