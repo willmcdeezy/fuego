@@ -1,6 +1,6 @@
 ---
 name: fuego
-description: Agent-ready Solana wallet system. Zero passwords, instant signing, local server. Built for autonomous agents that need frictionless Solana transactions.
+description: Agent-controlled Solana wallet with local signing, local server, local scripts. Everything runs on your machine. Built for autonomous agents that need frictionless Solana transactions.
 homepage: https://fuego.cash
 version: 1.4.0
 metadata:
@@ -14,7 +14,9 @@ metadata:
   }
 ---
 
-# Fuego: The Agent-Ready Solana Wallet v1.4.0
+# Fuego SKILL
+
+Local Solana agent wallet with sends, Jupiter swaps, and local infrastructure (scripts + server).
 
 The first Solana wallet designed FOR autonomous agents. Zero passwords, zero friction, maximum autonomy.
 
