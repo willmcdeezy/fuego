@@ -2,6 +2,7 @@
 name: fuego
 description: Agent-ready Solana wallet system. Zero passwords, instant signing, local server. Built for autonomous agents that need frictionless Solana transactions.
 homepage: https://fuego.cash
+version: 1.4.0
 metadata:
   {
     "openclaw":
@@ -13,7 +14,7 @@ metadata:
   }
 ---
 
-# Fuego: The Agent-Ready Solana Wallet
+# Fuego: The Agent-Ready Solana Wallet v1.4.0
 
 The first Solana wallet designed FOR autonomous agents. Zero passwords, zero friction, maximum autonomy.
 
@@ -711,16 +712,35 @@ curl -X POST http://127.0.0.1:8080/tokens \
 cp ~/.config/solana/fuego-backup.json ~/.fuego/wallet.json
 ```
 
+**Version mismatch / unexpected behavior**
+```bash
+# Ensure all components are up to date
+fuego update
+
+# This updates both fuego-cli and the fuego project
+# Restart server after updating: fuego serve
+```
+
 ---
 
 ## Supported Tokens & Networks
 
-### Mainnet Tokens
+### Transfer Tokens (fuego send)
+These tokens are supported by `fuego send`:
+
 | Token | Mint Address | Decimals | Status |
 |-------|-------------|----------|--------|
 | **SOL** | Native | 9 | Live |
 | **USDC** | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | 6 | Live |
 | **USDT** | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenEqw` | 6 | Live |
+
+### Swap Tokens (fuego swap / Jupiter)
+`fuego swap` supports **any token tradable on Jupiter**, including:
+- SOL, USDC, USDT (above)
+- BONK, JUP, PYTH, RAY, ORCA
+- Any SPL token with liquidity on Jupiter
+
+See https://jup.ag for full token list.
 
 ### Network Support
 - **mainnet-beta** - Production Solana network
