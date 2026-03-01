@@ -1,12 +1,13 @@
 {
   "name": "fuego",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Local Agentic Solana Wallet",
   "type": "module",
   "devDependencies": {
     "tsx": "^4.7.0"
   },
   "dependencies": {
-    "@solana/kit": "^6.1.0"
+    "@solana/kit": "^6.1.0",
+    "tweetnacl": "^1.0.3"
   }
 }

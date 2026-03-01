@@ -43,11 +43,12 @@ The `fuego-cli` gives your agent an easy-to-use, agent-friendly tool to handle t
 # 1. Install the CLI
 npm install -g fuego-cli
 
-# 2. Install this repo
+# 2. Create a wallet at ~/.fuego
+fuego create
+
+# 3. Install this repo (defaults to ~/.openclaw/workspace, or if pure CLI to current directory)
 fuego install
 
-# 3. Create a wallet at ~/.fuego
-fuego create
 ```
 
 Your agent is now ready to query balances, build transactions, and submit to the blockchain!
