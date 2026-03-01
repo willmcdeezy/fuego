@@ -639,11 +639,6 @@ async fn build_transfer_sol(
             .into_response();
         }
     };
-
-    // DEBUG: Check pubkey types
-    eprintln!("DEBUG: from_pubkey type check:");
-    eprintln!("  bytes: {:?}", from_pubkey.to_bytes());
-    eprintln!("  len: {}", from_pubkey.to_bytes().len());
     
     // Try converting to the format solana_system_interface expects
     let from_bytes = from_pubkey.to_bytes();
