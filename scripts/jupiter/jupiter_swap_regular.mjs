@@ -4,7 +4,12 @@
  * Uses standard Jupiter API for broader token support
  * 
  * Usage:
+ *   node jupiter_swap_regular.mjs --input <token> --output <token> --amount <amount>
+ * 
+ * Examples:
  *   node jupiter_swap_regular.mjs --input SOL --output BONK --amount 0.05
+ *   node jupiter_swap_regular.mjs --input SOL --output <mint-address> --amount 1.0
+ *   node jupiter_swap_regular.mjs --input USDC --output BONK --amount 10 --slippage 1.0
  */
 
 import { readFileSync } from 'fs';
@@ -59,11 +64,34 @@ function loadWalletPrivateKey() {
 
 function parseArgs() {
   const args = process.argv.slice(2);
+  
+  // Show help if no args
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    console.log(`
+🪐 Jupiter Swap (Regular API)
+
+Usage:
+  node jupiter_swap_regular.mjs --input <token> --output <token> --amount <amount> [--slippage <percent>]
+
+Parameters:
+  --input    Input token symbol (SOL, USDC) or full mint address
+  --output   Output token symbol (SOL, USDC, BONK) or full mint address
+  --amount   Amount to swap (in token units, e.g., 0.5 for 0.5 SOL)
+  --slippage Slippage tolerance in percent (default: 0.5%)
+
+Examples:
+  node jupiter_swap_regular.mjs --input SOL --output BONK --amount 0.05
+  node jupiter_swap_regular.mjs --input SOL --output EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v --amount 1.0
+  node jupiter_swap_regular.mjs --input USDC --output BONK --amount 10 --slippage 1.0
+    `);
+    process.exit(0);
+  }
+  
   const params = {
-    inputMint: TOKEN_MINTS['SOL'],
-    outputMint: TOKEN_MINTS['BONK'],
-    amount: '50000000',
-    slippageBps: '50'
+    inputMint: null,
+    outputMint: null,
+    amount: null,
+    slippageBps: '50'  // 0.5% default
   };
 
   for (let i = 0; i < args.length; i += 2) {
@@ -80,13 +108,7 @@ function parseArgs() {
         params.outputMint = TOKEN_MINTS[value.toUpperCase()] || value;
         break;
       case '--amount':
-        if (params.inputMint === TOKEN_MINTS['USDC']) {
-          params.amount = (parseFloat(value) * 1000000).toString();
-        } else if (params.inputMint === TOKEN_MINTS['SOL']) {
-          params.amount = (parseFloat(value) * 1000000000).toString();
-        } else {
-          params.amount = value;
-        }
+        params.amount = value;
         break;
       case '--slippage':
         params.slippageBps = (parseFloat(value) * 100).toString();
@@ -94,16 +116,65 @@ function parseArgs() {
     }
   }
   
+  // Validate required params
+  if (!params.inputMint) {
+    console.error('❌ Error: --input is required');
+    console.error('   Use --help for usage information');
+    process.exit(1);
+  }
+  
+  if (!params.outputMint) {
+    console.error('❌ Error: --output is required');
+    console.error('   Use --help for usage information');
+    process.exit(1);
+  }
+  
+  if (!params.amount) {
+    console.error('❌ Error: --amount is required');
+    console.error('   Use --help for usage information');
+    process.exit(1);
+  }
+  
+  // Convert amount based on input token decimals
+  const amountValue = parseFloat(params.amount);
+  if (isNaN(amountValue) || amountValue <= 0) {
+    console.error('❌ Error: --amount must be a positive number');
+    process.exit(1);
+  }
+  
+  if (params.inputMint === TOKEN_MINTS['SOL']) {
+    params.amount = Math.floor(amountValue * 1000000000).toString();
+  } else if (params.inputMint === TOKEN_MINTS['USDC']) {
+    params.amount = Math.floor(amountValue * 1000000).toString();
+  } else {
+    // For unknown tokens, assume 6 decimals as a safe default
+    params.amount = Math.floor(amountValue * 1000000).toString();
+  }
+  
   return params;
 }
 
-function formatAmount(mint, amount) {
+function formatAmount(mint, amount, quoteResponse = null) {
+  const amountInt = parseInt(amount);
+  
+  // Known tokens
   if (mint === TOKEN_MINTS['SOL']) {
-    return `${(parseInt(amount) / 1000000000).toFixed(6)} SOL`;
+    return `${(amountInt / 1000000000).toFixed(6)} SOL`;
   } else if (mint === TOKEN_MINTS['USDC']) {
-    return `${(parseInt(amount) / 1000000).toFixed(6)} USDC`;
+    return `${(amountInt / 1000000).toFixed(6)} USDC`;
   }
-  return amount;
+  
+  // Unknown token - try to get decimals from quote response or use default
+  let decimals = 6; // safe default
+  if (quoteResponse?.inputMint === mint && quoteResponse?.inDecimals) {
+    decimals = quoteResponse.inDecimals;
+  } else if (quoteResponse?.outputMint === mint && quoteResponse?.outDecimals) {
+    decimals = quoteResponse.outDecimals;
+  }
+  
+  const formatted = (amountInt / Math.pow(10, decimals)).toFixed(Math.min(decimals, 6));
+  const symbol = mint.substring(0, 4) + '...' + mint.substring(mint.length - 4);
+  return `${formatted} ${symbol}`;
 }
 
 async function fetchQuote(apiKey, params) {
@@ -245,8 +316,8 @@ async function main() {
   
   console.log(`📊 Swap Details:`);
   console.log(`   Wallet: ${walletAddress}`);
-  console.log(`   Input: ${params.inputMint === TOKEN_MINTS['SOL'] ? 'SOL' : params.inputMint}`);
-  console.log(`   Output: ${params.outputMint === TOKEN_MINTS['BONK'] ? 'BONK' : params.outputMint}`);
+  console.log(`   Input: ${params.inputMint.length === 44 ? params.inputMint.substring(0, 8) + '...' + params.inputMint.substring(params.inputMint.length - 8) : params.inputMint}`);
+  console.log(`   Output: ${params.outputMint.length === 44 ? params.outputMint.substring(0, 8) + '...' + params.outputMint.substring(params.outputMint.length - 8) : params.outputMint}`);
   console.log(`   Amount: ${formatAmount(params.inputMint, params.amount)}`);
   console.log(`   Slippage: ${(parseInt(params.slippageBps) / 100).toFixed(2)}%\n`);
   
@@ -255,8 +326,8 @@ async function main() {
     const quote = await fetchQuote(config.jupiterKey, params);
     
     console.log(`✓ Quote received`);
-    console.log(`   Input: ${formatAmount(quote.inputMint, quote.inAmount)}`);
-    console.log(`   Output: ${formatAmount(quote.outputMint, quote.outAmount)}`);
+    console.log(`   Input: ${formatAmount(quote.inputMint, quote.inAmount, quote)}`);
+    console.log(`   Output: ${formatAmount(quote.outputMint, quote.outAmount, quote)}`);
     console.log(`   Price Impact: ${quote.priceImpactPct}%\n`);
     
     // Step 2: Get swap transaction
@@ -281,7 +352,7 @@ async function main() {
     console.log('\n✅ SWAP SUCCESSFUL!');
     console.log(`🔗 Signature: ${signature}`);
     console.log(`🌐 Explorer: https://solscan.io/tx/${signature}`);
-    console.log(`\n💰 Swapped ${formatAmount(quote.inputMint, quote.inAmount)} → ${formatAmount(quote.outputMint, quote.outAmount)}`);
+    console.log(`\n💰 Swapped ${formatAmount(quote.inputMint, quote.inAmount, quote)} → ${formatAmount(quote.outputMint, quote.outAmount, quote)}`);
     
   } catch (err) {
     console.error('\n❌ Swap failed:', err.message);
