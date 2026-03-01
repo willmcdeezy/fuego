@@ -590,7 +590,10 @@ fuego/
 ├── package.json       # Dependencies for scripts
 ├── scripts/           # Agent-ready transaction scripts
 │   ├── fuego_transfer.mjs           # Main transaction tool
-│   └── x402_purch.mjs               # x402 payment handler
+│   ├── x402_purch.mjs               # x402 payment handler
+│   └── jupiter/                     # Jupiter swap integration
+│       ├── jupiter_swap_regular.mjs # Token swaps via Jupiter
+│       └── jupiter_price.mjs        # Price quotes
 ├── server/            # Rust HTTP server
 │   ├── Cargo.toml     # Rust dependencies
 │   └── src/
@@ -797,8 +800,6 @@ RUST_LOG=debug ./target/release/fuego-server
 **Faster RPC endpoint:**
 ```rust
 // In server/src/main.rs, use premium RPC
-let rpc_url = "https://solana-api.projectserum.com"; // Faster
-// or
 let rpc_url = "https://rpc.helius.xyz/?api-key=YOUR_KEY"; // Premium
 ```
 
