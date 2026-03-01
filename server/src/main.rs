@@ -639,11 +639,6 @@ async fn build_transfer_sol(
             .into_response();
         }
     };
-
-    // DEBUG: Check pubkey types
-    eprintln!("DEBUG: from_pubkey type check:");
-    eprintln!("  bytes: {:?}", from_pubkey.to_bytes());
-    eprintln!("  len: {}", from_pubkey.to_bytes().len());
     
     // Try converting to the format solana_system_interface expects
     let from_bytes = from_pubkey.to_bytes();
@@ -1145,10 +1140,163 @@ async fn get_all_transactions(
 }
 
 // TODO: PYUSD balance endpoint using Token-2022
-// Requires getTokenAccountsByOwner implementation
-// Issue: Standard ATA derivation doesn't work for Token-2022
-// Solution: Enumerate all token accounts owned by wallet and find by mint
+// getTokenAccountsByOwner is implemented via raw RPC (jsonParsed) in get_tokens — no account decoder.
+// Token metadata for known tokens
+fn get_token_symbol(mint: &str) -> Option<&str> {
+    match mint {
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" => Some("USDC"),
+        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB" => Some("USDT"),
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263" => Some("BONK"),
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN" => Some("JUP"),
+        _ => None,
+    }
+}
 
+const TOKEN_PROGRAM_ID: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+
+/// Call getTokenAccountsByOwner via raw RPC (jsonParsed) and parse response as JSON.
+/// Avoids solana_account_decoder; uses only reqwest + serde_json.
+async fn fetch_token_accounts_json(rpc_url: &str, wallet_address: &str) -> Result<Vec<serde_json::Value>, String> {
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getTokenAccountsByOwner",
+        "params": [
+            wallet_address,
+            { "programId": TOKEN_PROGRAM_ID },
+            { "encoding": "jsonParsed" }
+        ]
+    });
+    let client = reqwest::Client::new();
+    let res = client
+        .post(rpc_url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let value = json
+        .get("result")
+        .and_then(|r| r.get("value"))
+        .ok_or_else(|| "Missing result.value in RPC response".to_string())?;
+    let arr = value.as_array().ok_or_else(|| "result.value is not an array".to_string())?;
+    Ok(arr.clone())
+}
+
+#[derive(Serialize, Deserialize)]
+struct GetTokensRequest {
+    address: String,
+    network: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TokenAccountInfo {
+    mint: String,
+    symbol: Option<String>,
+    amount: String,
+    decimals: u8,
+    ui_amount: f64,
+    token_account: String,
+}
+
+async fn get_tokens(
+    Json(payload): Json<GetTokensRequest>,
+) -> Response {
+    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc = RpcClient::new(rpc_url.clone());
+
+    let wallet_pubkey = match string_to_pub_key(&payload.address) {
+        Ok(pubkey) => pubkey,
+        Err(_) => {
+            return Json(json!({
+                "success": false,
+                "error": "Invalid wallet address"
+            })).into_response();
+        }
+    };
+
+    // Get SOL balance (no account decoder involved)
+    let sol_balance = match rpc.get_balance(&wallet_pubkey) {
+        Ok(lamports) => lamports,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to get SOL balance: {}", e)
+            })).into_response();
+        }
+    };
+
+    // Get token accounts via raw RPC (jsonParsed) and parse as JSON — no solana_account_decoder
+    let token_accounts = match fetch_token_accounts_json(&rpc_url, &payload.address).await {
+        Ok(accounts) => accounts,
+        Err(e) => {
+            return Json(json!({
+                "success": false,
+                "error": format!("Failed to get token accounts: {}", e)
+            })).into_response();
+        }
+    };
+
+    let mut tokens: Vec<TokenAccountInfo> = Vec::new();
+    for item in token_accounts {
+        let pubkey = item.get("pubkey").and_then(|p| p.as_str()).unwrap_or("").to_string();
+        let account = match item.get("account") {
+            Some(a) => a,
+            None => continue,
+        };
+        let data = match account.get("data") {
+            Some(d) => d,
+            None => continue,
+        };
+        let parsed = match data.get("parsed") {
+            Some(p) => p,
+            None => continue,
+        };
+        let info = match parsed.get("info") {
+            Some(i) => i,
+            None => continue,
+        };
+        let mint = info.get("mint").and_then(|m| m.as_str()).unwrap_or("").to_string();
+        let token_amount = info.get("tokenAmount");
+        let amount = token_amount
+            .and_then(|t| t.get("amount"))
+            .and_then(|a| a.as_str())
+            .unwrap_or("0")
+            .to_string();
+        let decimals = token_amount
+            .and_then(|t| t.get("decimals"))
+            .and_then(|d| d.as_u64())
+            .unwrap_or(0) as u8;
+        let ui_amount = token_amount
+            .and_then(|t| t.get("uiAmount"))
+            .and_then(|u| u.as_f64())
+            .unwrap_or(0.0);
+
+        tokens.push(TokenAccountInfo {
+            mint: mint.clone(),
+            symbol: get_token_symbol(&mint).map(|s| s.to_string()),
+            amount,
+            decimals,
+            ui_amount,
+            token_account: pubkey,
+        });
+    }
+
+    // Sort by UI amount (descending)
+    tokens.sort_by(|a, b| b.ui_amount.partial_cmp(&a.ui_amount).unwrap_or(std::cmp::Ordering::Equal));
+
+    Json(json!({
+        "success": true,
+        "data": {
+            "wallet": payload.address,
+            "network": payload.network,
+            "sol_balance": sol_balance as f64 / 1_000_000_000.0,
+            "sol_lamports": sol_balance,
+            "tokens": tokens,
+            "token_count": tokens.len()
+        }
+    })).into_response()
+}
 
 async fn get_wallet_address() -> Response {
     // Try to load wallet address from ~/.fuego/wallet-config.json
@@ -1217,6 +1365,7 @@ async fn main() {
         .route("/usdc-balance", post(get_usdc_balance))
         .route("/usdt-balance", post(get_usdt_balance))
         .route("/all-transactions", post(get_all_transactions))
+        .route("/tokens", post(get_tokens))
         // TRANSFER endpoints
         .route("/build-transfer-usdc", post(build_transfer_usdc))
         .route("/build-transfer-sol", post(build_transfer_sol))
@@ -1238,6 +1387,7 @@ async fn main() {
     println!("    POST /sol-balance - Get SOL balance");
     println!("    POST /usdc-balance - Get USDC balance");
     println!("    POST /usdt-balance - Get USDT balance");
+    println!("    POST /tokens - Get all SPL token accounts with balances");
     println!("  BUILD TRANSFERS:");
     println!("    POST /build-transfer-sol - Build unsigned SOL transfer (agent signs in script)");
     println!("    POST /build-transfer-usdc - Build unsigned USDC transfer (agent signs in script)");

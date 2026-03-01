@@ -52,10 +52,25 @@
             line-height: 1.5;
         }
 
+        /* Sticky Footer */
+        .sticky-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            z-index: 100;
+        }
+
         .container {
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 20px 20px 60px 20px;
         }
 
         /* Header */
@@ -381,14 +396,220 @@
             font-size: 13px;
         }
 
-        /* Footer */
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
-            text-align: center;
-            font-size: 12px;
+        /* Segment Toggle for Tokens/Transactions */
+        .segment-control {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 16px;
+            gap: 4px;
+        }
+
+        .segment-btn {
+            flex: 1;
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
             color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .segment-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .segment-btn.active {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Content panels */
+        .content-panel {
+            display: none;
+        }
+
+        .content-panel.active {
+            display: block;
+        }
+
+        /* Two Column Layout for Activity + Tokens */
+        .dashboard-columns {
+            display: block;
+            margin-top: 32px;
+        }
+
+        .column-section {
+            width: 100%;
+        }
+
+        /* Token List Styles - Plain */
+        .token-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .token-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            transition: background 0.15s;
+        }
+
+        .token-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .token-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .token-symbol {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .token-mint {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: 'Monaco', 'Menlo', monospace;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .mint-copy-wrapper {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            cursor: pointer;
+            padding: 2px 0;
+            border-radius: 4px;
+            transition: background 0.15s;
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: 'Monaco', 'Menlo', monospace;
+            word-break: break-all;
+        }
+
+        .mint-copy-wrapper:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .mint-address {
+            transition: color 0.2s;
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .mint-copy-wrapper:hover .mint-address {
+            color: var(--accent-purple);
+        }
+
+        .copy-btn-wrapper {
+            display: inline-flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .copy-icon {
+            fill: var(--text-secondary);
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .copied-text {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 10px;
+            color: var(--accent-green);
+            font-weight: 600;
+            margin-left: 4px;
+            transform: translateX(-20px);
+            opacity: 0;
+            transition: none;
+            white-space: nowrap;
+        }
+
+        .mint-copy-wrapper.copied .copied-text {
+            animation: slideOutIn 1.5s ease forwards;
+        }
+
+        .mint-copy-wrapper.copied .copy-icon {
+            opacity: 0;
+            animation: iconFade 1.5s ease forwards;
+        }
+
+        @keyframes slideOutIn {
+            0% {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            20% {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            80% {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+        }
+
+        @keyframes iconFade {
+            0% { opacity: 0; }
+            20% { opacity: 0; }
+            30% { opacity: 1; }
+            70% { opacity: 1; }
+            80% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        .token-amount {
+            text-align: right;
+            flex-shrink: 0;
+            padding-top: 2px;
+        }
+
+        .token-balance {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .token-usd {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .no-tokens {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 30px 20px;
+            font-size: 13px;
         }
 
         /* Responsive */
@@ -446,7 +667,7 @@
         <!-- Error -->
         <div id="error"></div>
 
-        <!-- Balances -->
+        <!-- Balances (SOL + USDC only) -->
         <div class="section-title">Balances</div>
         <div class="balances-grid" id="balances">
             <div class="balance-item full-width loading">
@@ -455,24 +676,38 @@
             </div>
         </div>
 
-        <!-- Transactions -->
-        <div class="section-title">
-            <span>Recent Activity</span>
-            <button class="refresh-btn" onclick="refreshTransactions()" id="refreshBtn">
-                <span>Refresh</span>
-            </button>
-        </div>
-        
-        <div class="tx-list" id="txList">
-            <div class="segment-loading">
-                <div class="segment-spinner"></div>
-                <span>Loading transactions...</span>
+        <!-- Full Width Section: Tokens / Transactions with Segment Toggle -->
+        <div class="dashboard-columns">
+            <div class="column-section">
+                <div class="segment-control">
+                    <button class="segment-btn active" onclick="switchSegment('tokens')" id="btn-tokens">Tokens</button>
+                    <button class="segment-btn" onclick="switchSegment('transactions')" id="btn-transactions">Transactions</button>
+                </div>
+                
+                <!-- Tokens Panel -->
+                <div id="panel-tokens" class="content-panel active">
+                    <div class="token-list" id="tokenList">
+                        <div class="segment-loading">
+                            <div class="segment-spinner"></div>
+                            <span>Loading tokens...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Transactions Panel -->
+                <div id="panel-transactions" class="content-panel">
+                    <div class="tx-list" id="txList">
+                        <div class="segment-loading">
+                            <div class="segment-spinner"></div>
+                            <span>Loading transactions...</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Footer -->
-        <div class="footer">
-            <p>Fuego • Secure agent Solana wallet<br/>mainnet-beta</p>
+        <div class="sticky-footer">
+            Fuego • mainnet-beta
         </div>
     </div>
 
@@ -495,14 +730,130 @@
         const TOKEN_IDS = {
             'SOL': 'solana',
             'USDC': 'usd-coin',
-            'USDT': 'tether'
+            'USDT': 'tether',
+            'BONK': 'bonk'
         };
+
+        // Solana Token List cache
+        const TOKEN_LIST_CACHE_KEY = 'fuego_token_list';
+        const TOKEN_LIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+        let tokenListCache = null;
+
+        // Fetch and cache Solana token list
+        async function fetchTokenList() {
+            // Check localStorage cache first
+            const cached = localStorage.getItem(TOKEN_LIST_CACHE_KEY);
+            const cachedTime = localStorage.getItem(TOKEN_LIST_CACHE_KEY + '_time');
+            
+            if (cached && cachedTime) {
+                const age = Date.now() - parseInt(cachedTime);
+                if (age < TOKEN_LIST_CACHE_TTL) {
+                    console.log('Using cached token list');
+                    tokenListCache = JSON.parse(cached);
+                    return tokenListCache;
+                }
+            }
+
+            // Fetch fresh list
+            try {
+                console.log('Fetching Solana token list...');
+                const response = await fetch('https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json');
+                if (!response.ok) throw new Error('Failed to fetch token list');
+                
+                const data = await response.json();
+                
+                // Only keep top 100 tokens to save localStorage space
+                if (data.tokens && data.tokens.length > 100) {
+                    data.tokens = data.tokens.slice(0, 100);
+                }
+                
+                tokenListCache = data;
+                
+                // Cache in localStorage
+                localStorage.setItem(TOKEN_LIST_CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(TOKEN_LIST_CACHE_KEY + '_time', Date.now().toString());
+                
+                console.log(`Loaded ${data.tokens?.length || 0} tokens (cached top 100)`);
+                return data;
+            } catch (error) {
+                console.error('Failed to fetch token list:', error);
+                return null;
+            }
+        }
+
+        // Lookup token symbol by mint address
+        function lookupTokenSymbol(mint) {
+            if (!tokenListCache || !tokenListCache.tokens) return null;
+            
+            const token = tokenListCache.tokens.find(t => 
+                t.address === mint || t.address.toLowerCase() === mint.toLowerCase()
+            );
+            
+            return token?.symbol || null;
+        }
+
+        // Hardcoded fallback for common tokens (instant load)
+        const FALLBACK_TOKEN_SYMBOLS = {
+            'So11111111111111111111111111111111111111112': 'SOL',
+            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
+            'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'USDT',
+            'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'BONK',
+            'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 'JUP',
+            '7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7AR': 'mSOL',
+            'bSo13r4TkiE4xumqJWryAufPpB52WAC7nDVRMVh5j57': 'bSOL',
+            'ZScHuTtqZukUraZ7E6jHs2kKLzFa7bQrZzRBFtEzqYM': 'stSOL',
+            'RLBxxFk7ANn3P2v2g76j6tW9Drp7JVn2RLp8RNcjc9Y': 'RLB',
+            'DUSTawucrLJ1oJDq6rUX1n4r8L9tzN4g4B7gWbV9X8L': 'DUST',
+            'kinXdEcpDQeHPEuQnqmUfgQWKd7oKBF5p9tX8vQG1qY': 'KIN',
+            '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R': 'RAY',
+            'MangoCzJ36AjZyKwVj3VnYU4GTonLKvZ6A8vGqBz9QZ': 'MNGO',
+            'ATLASXmbPQxBUYbxPsV97usA3fPQYEqzQBUHigFCusr9': 'ATLAS',
+            'POLISXxY4fhbBGyXw3wR8y9bW4w3wR8y9bW4w3wR8y9b': 'POLIS',
+            'FIDA2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzXzX': 'FIDA',
+            'SLND2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzXzX': 'SLND',
+            'STEP2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzX': 'STEP',
+            'SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuWJnqo': 'SRM',
+            'MER2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzXzX': 'MER',
+            'SAMO2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzX': 'SAMO',
+            'COPE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzXzX': 'COPE',
+            'TULIP2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'TULIP',
+            'ORCA2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'ORCA',
+            'AURY2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'AURY',
+            'GENE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'GENE',
+            'SBR2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'SBR',
+            'LQID2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'LQID',
+            'PRT2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'PRT',
+            'MNDE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'MNDE',
+            'STAKE2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'STAKE',
+            'WBTC2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'WBTC',
+            'WETH2pMZKyYF2RzC7q6cWzXzXzXzXzXzXzXzXzX': 'WETH'
+        };
+
+        // Get token symbol with fallback
+        function getTokenSymbol(mint) {
+            // First check hardcoded fallbacks (instant)
+            if (FALLBACK_TOKEN_SYMBOLS[mint]) {
+                return FALLBACK_TOKEN_SYMBOLS[mint];
+            }
+            
+            // Then check fetched token list
+            const fromList = lookupTokenSymbol(mint);
+            if (fromList) return fromList;
+            
+            // Return null if unknown
+            return null;
+        }
 
         async function loadDashboard() {
             try {
+                // Fetch token list in background (for symbol lookups)
+                fetchTokenList().catch(err => console.log('Token list fetch failed:', err));
+                
                 const address = await getWalletAddress();
                 document.getElementById('address').textContent = address;
                 await loadBalances(address);
+                // Load all tokens (excluding USDC which is already shown in balances)
+                await loadAllTokens(address);
                 // Load all transactions (Fuego ones will be styled specially)
                 await loadAllTransactions(address);
             } catch (error) {
@@ -554,87 +905,57 @@
             const container = document.getElementById('balances');
             
             try {
-                // Fetch prices alongside balances
-                const [solRes, usdcRes, usdtRes, prices] = await Promise.all([
-                    fetch(`${API_URL}/sol-balance`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ network: NETWORK, address })
-                    }),
-                    fetch(`${API_URL}/usdc-balance`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ network: NETWORK, address })
-                    }),
-                    fetch(`${API_URL}/usdt-balance`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ network: NETWORK, address })
-                    }),
-                    fetchTokenPrices()
-                ]);
-
-                const solData = await solRes.json();
-                const usdcData = await usdcRes.json();
-                const usdtData = await usdtRes.json();
-
-                let html = '';
-
-                if (solData.success && solData.data && solData.data.sol !== undefined) {
-                    const solAmount = solData.data.sol || 0;
-                    const solPrice = prices?.solana?.usd;
-                    const usdValue = solPrice ? formatUSDPrice(solAmount * solPrice) : '';
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
-                                SOL
-                            </div>
-                            <div class="balance-amount">${solAmount.toFixed(9)}</div>
-                            ${usdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdValue}</div>` : ''}
-                            <div class="balance-unit">Solana</div>
-                        </div>
-                    `;
-                } else {
-                    html += `
-                        <div class="balance-item">
-                            <div class="balance-label">
-                                <span class="balance-label-dot dot-sol"></span>
-                                SOL
-                            </div>
-                            <div class="balance-amount">—</div>
-                            <div class="balance-unit">Error loading</div>
-                        </div>
-                    `;
+                // Single call to get all tokens and SOL balance
+                const tokensRes = await fetch(`${API_URL}/tokens`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ network: NETWORK, address })
+                });
+                
+                if (!tokensRes.ok) {
+                    throw new Error('Failed to fetch tokens');
                 }
-
-                const usdcAmount = (usdcData.success && usdcData.data?.ui_amount !== undefined) ? parseFloat(usdcData.data.ui_amount) : 0;
+                
+                const tokensData = await tokensRes.json();
+                
+                if (!tokensData.success || !tokensData.data) {
+                    throw new Error('Invalid tokens response');
+                }
+                
+                const { sol_balance, tokens } = tokensData.data;
+                
+                // Fetch prices for USD values
+                const prices = await fetchTokenPrices();
+                
+                let html = '';
+                
+                // SOL Balance
+                const solPrice = prices?.solana?.usd;
+                const solUsdValue = solPrice ? formatUSDPrice(sol_balance * solPrice) : '';
+                html += `
+                    <div class="balance-item" style="margin-bottom: 8px;">
+                        <div class="balance-label">
+                            <img src="tokens/solanaLogoMark.svg" alt="SOL" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
+                            SOL
+                        </div>
+                        <div class="balance-amount">${sol_balance.toFixed(4)}</div>
+                        ${solUsdValue ? `<div class="balance-price" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${solUsdValue}</div>` : ''}
+                    </div>
+                `;
+                
+                // Find USDC in tokens array (return 0 if not found)
+                const usdcToken = tokens.find(t => t.symbol === 'USDC');
+                const usdcAmount = usdcToken ? usdcToken.ui_amount : 0;
                 const usdcPrice = prices?.['usd-coin']?.usd;
                 const usdcUsdValue = usdcPrice ? formatUSDPrice(usdcAmount * usdcPrice) : '';
                 html += `
-                    <div class="balance-item">
+                    <div class="balance-item" style="margin-bottom: 8px;">
                         <div class="balance-label">
                             <img src="tokens/usdc.svg" alt="USDC" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
                             USDC
                         </div>
-                        <div class="balance-amount">$${usdcAmount.toFixed(6)}</div>
-                        ${usdcUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdcUsdValue}</div>` : ''}
-                        <div class="balance-unit">USD Coin</div>
-                    </div>
-                `;
-
-                const usdtAmount = (usdtData.success && usdtData.data?.ui_amount !== undefined) ? parseFloat(usdtData.data.ui_amount) : 0;
-                const usdtPrice = prices?.tether?.usd;
-                const usdtUsdValue = usdtPrice ? formatUSDPrice(usdtAmount * usdtPrice) : '';
-                html += `
-                    <div class="balance-item">
-                        <div class="balance-label">
-                            <img src="tokens/usdt.svg" alt="USDT" style="width: 20px; height: 20px; margin-right: 8px; display: inline-block; vertical-align: middle;">
-                            USDT
-                        </div>
-                        <div class="balance-amount">$${usdtAmount.toFixed(6)}</div>
-                        ${usdtUsdValue ? `<div class="balance-price" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${usdtUsdValue}</div>` : ''}
-                        <div class="balance-unit">Tether</div>
+                        <div class="balance-amount">${usdcAmount.toFixed(2)}</div>
+                        ${usdcUsdValue ? `<div class="balance-price" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${usdcUsdValue}</div>` : ''}
                     </div>
                 `;
 
@@ -644,12 +965,97 @@
             }
         }
 
+        // Segment toggle function
+        function switchSegment(segment) {
+            // Update buttons
+            document.querySelectorAll('.segment-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${segment}`).classList.add('active');
+            
+            // Update panels
+            document.querySelectorAll('.content-panel').forEach(panel => panel.classList.remove('active'));
+            document.getElementById(`panel-${segment}`).classList.add('active');
+            
+            // Load data if needed
+            const address = document.getElementById('address').textContent;
+            if (segment === 'transactions' && address && address !== 'Loading...') {
+                loadAllTransactions(address);
+            }
+        }
+
+        async function loadAllTokens(address) {
+            const container = document.getElementById('tokenList');
+            
+            try {
+                const tokensRes = await fetch(`${API_URL}/tokens`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ network: NETWORK, address })
+                });
+                
+                if (!tokensRes.ok) {
+                    throw new Error('Failed to fetch tokens');
+                }
+                
+                const tokensData = await tokensRes.json();
+                
+                if (!tokensData.success || !tokensData.data) {
+                    throw new Error('Invalid tokens response');
+                }
+                
+                const { tokens } = tokensData.data;
+                
+                // Filter out USDC (already shown in main balances)
+                const otherTokens = tokens.filter(t => t.symbol !== 'USDC');
+                
+                if (otherTokens.length === 0) {
+                    container.innerHTML = '<div class="no-tokens">No other tokens found</div>';
+                    return;
+                }
+                
+                // Fetch prices for all tokens by mint address
+                const tokenPrices = await fetchTokenPricesByMint(otherTokens);
+                
+                let html = '';
+                otherTokens.forEach(token => {
+                    const displaySymbol = getTokenSymbol(token.mint) || 'Unknown';
+                    // Try lowercase mint first, then uppercase
+                    let priceData = tokenPrices?.[token.mint?.toLowerCase()] || tokenPrices?.[token.mint];
+                    const price = priceData?.usd;
+                    const usdValue = price ? (token.ui_amount * price).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }) : null;
+                    
+                    html += `
+                        <div class="token-item">
+                            <div class="token-main">
+                                <div class="token-symbol">${displaySymbol}</div>
+                                <div class="mint-copy-wrapper" onclick="copyMintAddress('${token.mint}', this)">
+                                    <span class="mint-address">${token.mint}</span>
+                                    <span class="copy-btn-wrapper">
+                                        <svg class="copy-icon" width="14" height="14" viewBox="0 0 115.77 122.88"><path d="M89.62,13.96v7.73h12.19h0.01v0.02c3.85,0.01,7.34,1.57,9.86,4.1c2.5,2.51,4.06,5.98,4.07,9.82h0.02v0.02 v73.27v0.01h-0.02c-0.01,3.84-1.57,7.33-4.1,9.86c-2.51,2.5-5.98,4.06-9.82,4.07v0.02h-0.02h-61.7H40.1v-0.02 c-3.84-0.01-7.34-1.57-9.86-4.1c-2.5-2.51-4.06-5.98-4.07-9.82h-0.02v-0.02V92.51H13.96h-0.01v-0.02c-3.84-0.01-7.34-1.57-9.86-4.1 c-2.5-2.51-4.06-5.98-4.07-9.82H0v-0.02V13.96v-0.01h0.02c0.01-3.85,1.58-7.34,4.1-9.86c2.51-2.5,5.98-4.06,9.82-4.07V0h0.02h61.7 h0.01v0.02c3.85,0.01,7.34,1.57,9.86,4.1c2.5,2.51,4.06,5.98,4.07,9.82h0.02V13.96L89.62,13.96z M79.04,21.69v-7.73v-0.02h0.02 c0-0.91-0.39-1.75-1.01-2.37c-0.61-0.61-1.46-1-2.37-1v0.02h-0.01h-61.7h-0.02v-0.02c-0.91,0-1.75,0.39-2.37,1.01 c-0.61,0.61-1,1.46-1,2.37h0.02v0.01v64.59v0.02h-0.02c0,0.91,0.39,1.75,1.01,2.37c0.61,0.61,1.46,1,2.37,1v-0.02h0.01h12.19V35.65 v-0.01h0.02c0.01-3.85,1.58-7.34,4.1-9.86c2.51-2.5,5.98-4.06,9.82-4.07v-0.02h0.02H79.04L79.04,21.69z M105.18,108.92V35.65v-0.02 h0.02c0-0.91-0.39-1.75-1.01-2.37c-0.61-0.61-1.46-1-2.37-1v0.02h-0.01h-61.7h-0.02v-0.02c-0.91,0-1.75,0.39-2.37,1.01 c-0.61,0.61-1,1.46-1,2.37h0.02v0.01v73.27v0.02h-0.02c0,0.91,0.39,1.75,1.01,2.37c0.61,0.61,1.46,1,2.37,1v-0.02h0.01h61.7h0.02 v0.02c0.91,0,1.75-0.39,2.37-1.01c0.61-0.61,1-1.46,1-2.37h-0.02V108.92L105.18,108.92z"/></svg>
+                                        <span class="copied-text">Copied</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="token-amount">
+                                <div class="token-balance">${token.ui_amount.toLocaleString()}</div>
+                                ${usdValue ? `<div class="token-usd" style="font-size: 11px; color: var(--text-secondary);">${usdValue}</div>` : '<div class="token-usd" style="font-size: 11px; color: var(--text-secondary); opacity: 0.6;">Price unavailable</div>'}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Failed to load tokens:', error);
+                container.innerHTML = '<div class="no-tokens">Failed to load tokens</div>';
+            }
+        }
+
         function formatAddress(addr) {
             if (!addr || addr.length < 16) return addr || 'unknown';
             return `${addr.substring(0, 4)}…${addr.substring(addr.length - 4)}`;
         }
 
-        // Fetch token prices from CoinGecko
+        // Fetch token prices from CoinGecko by token ID
         async function fetchTokenPrices() {
             try {
                 const ids = Object.values(TOKEN_IDS).join(',');
@@ -660,6 +1066,67 @@
                 console.log('CoinGecko error:', error);
                 return null;
             }
+        }
+
+        // Fetch token prices from CoinGecko by mint address (contract address)
+        async function fetchTokenPricesByMint(tokens) {
+            if (!tokens || tokens.length === 0) return null;
+            
+            const prices = {};
+            const mintAddresses = tokens.map(t => t.mint);
+            
+            // Try contract address endpoint first
+            try {
+                const addresses = mintAddresses.join(',');
+                const url = `${COINGECKO_API}/simple/token_price/solana?contract_addresses=${addresses}&vs_currencies=usd`;
+                
+                console.log('Fetching contract prices for:', addresses);
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Contract price data:', data);
+                    Object.assign(prices, data);
+                } else {
+                    console.log('Contract price fetch failed:', response.status);
+                }
+            } catch (error) {
+                console.log('Contract price error:', error);
+            }
+            
+            // Fallback: Try by symbol for known tokens that didn't get a price
+            try {
+                const missingPriceTokens = tokens.filter(t => {
+                    const mintLower = t.mint?.toLowerCase();
+                    const mintUpper = t.mint;
+                    return TOKEN_IDS[t.symbol] && !prices[mintLower] && !prices[mintUpper];
+                });
+                
+                if (missingPriceTokens.length > 0) {
+                    const ids = missingPriceTokens.map(t => TOKEN_IDS[t.symbol]).join(',');
+                    const url = `${COINGECKO_API}/simple/price?ids=${ids}&vs_currencies=usd`;
+                    
+                    console.log('Fetching symbol prices for:', ids);
+                    
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Symbol price data:', data);
+                        
+                        // Map symbol-based prices back to mint addresses
+                        missingPriceTokens.forEach(token => {
+                            const id = TOKEN_IDS[token.symbol];
+                            if (data[id]?.usd) {
+                                prices[token.mint.toLowerCase()] = { usd: data[id].usd };
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.log('Symbol price error:', error);
+            }
+            
+            return prices;
         }
 
         function formatUSDPrice(price) {
@@ -863,7 +1330,7 @@
                     }
                     
                     html += `
-                        <div class="tx-item">
+                        <a href="https://solscan.io/tx/${tx.signature}" target="_blank" class="tx-item" style="text-decoration: none; color: inherit; display: flex;">
                             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                                 ${largeTokenIcon}
                                 <div class="tx-info">
@@ -882,11 +1349,8 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <span style="font-weight: 600; color: var(--accent-orange); font-size: 13px; white-space: nowrap;">${directionLabel}</span>
-                                <div class="tx-link">
-                                    <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
-                                </div>
                             </div>
-                        </div>
+                        </a>
                     `;
                 } else {
                     // Regular transaction - simple styling
@@ -902,7 +1366,7 @@
                     const statusText = isFinalized ? 'Finalized' : 'Pending';
                     
                     html += `
-                        <div class="tx-item">
+                        <a href="https://solscan.io/tx/${tx.signature}" target="_blank" class="tx-item" style="text-decoration: none; color: inherit; display: flex;">
                             <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                                 <span style="font-size: 20px;">📄</span>
                                 <div class="tx-info">
@@ -915,10 +1379,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="tx-link">
-                                <a href="https://explorer.solana.com/tx/${tx.signature}?cluster=${NETWORK}" target="_blank">View</a>
-                            </div>
-                        </div>
+                        </a>
                     `;
                 }
             });
@@ -937,6 +1398,18 @@
                     btn.textContent = original;
                     btn.classList.remove('copied');
                 }, 2000);
+            });
+        }
+
+        function copyMintAddress(mint, wrapper) {
+            navigator.clipboard.writeText(mint).then(() => {
+                // Add copied class to trigger animation
+                wrapper.classList.add('copied');
+                
+                // Remove class after animation completes
+                setTimeout(() => {
+                    wrapper.classList.remove('copied');
+                }, 1500);
             });
         }
 
