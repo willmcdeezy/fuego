@@ -25,9 +25,20 @@ const WALLET_PATH = join(homedir(), '.fuego', 'wallet.json');
 const JUPITER_QUOTE_URL = 'https://api.jup.ag/swap/v1/quote';
 const JUPITER_SWAP_URL = 'https://api.jup.ag/swap/v1/swap';
 
+// Token decimals registry (fallback for common tokens)
+const TOKEN_DECIMALS = {
+  'So11111111111111111111111111111111111111112': 9,  // SOL
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 6,  // USDC
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenEqw': 6,  // USDT
+  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 5,  // BONK
+  'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt': 6,  // PYTH
+  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 6,  // JUP
+};
+
 const TOKEN_MINTS = {
   'SOL': 'So11111111111111111111111111111111111111112',
   'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenEqw',
   'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
 };
 
@@ -60,6 +71,110 @@ function loadWalletPrivateKey() {
     console.error('❌ Failed to load wallet:', err.message);
     process.exit(1);
   }
+}
+
+/**
+ * Fetch token decimals from on-chain metadata
+ * Uses SPL Token program to get mint info
+ */
+async function fetchTokenDecimals(rpcUrl, mintAddress) {
+  // Check registry first
+  if (TOKEN_DECIMALS[mintAddress]) {
+    return TOKEN_DECIMALS[mintAddress];
+  }
+
+  console.log(`🔍 Fetching decimals for ${mintAddress.substring(0, 8)}...${mintAddress.substring(mintAddress.length - 8)} from chain`);
+  
+  try {
+    // SPL Token mint account layout:
+    // - 4 bytes: mint authority option
+    // - 32 bytes: mint authority pubkey (if present)
+    // - 8 bytes: supply (u64)
+    // - 1 byte: decimals (u8)
+    // - 1 byte: mint authority option
+    // - 1 byte: freeze authority option
+    // - 32 bytes: freeze authority pubkey (if present)
+    
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getAccountInfo',
+        params: [
+          mintAddress,
+          { encoding: 'base64' }
+        ]
+      })
+    });
+
+    const result = await response.json();
+    
+    if (result.error || !result.result?.value?.data) {
+      throw new Error(`Failed to fetch mint info: ${result.error?.message || 'No data'}`);
+    }
+
+    const data = Buffer.from(result.result.value.data[0], 'base64');
+    
+    // Decimals is at offset 44 (after mint authority option + pubkey + supply)
+    // Layout: 4 (option) + 32 (pubkey) + 8 (supply) = 44, then 1 byte for decimals
+    const decimals = data[44];
+    
+    console.log(`✓ Found decimals: ${decimals}`);
+    
+    // Cache it
+    TOKEN_DECIMALS[mintAddress] = decimals;
+    
+    return decimals;
+  } catch (err) {
+    console.warn(`⚠️  Failed to fetch decimals on-chain: ${err.message}`);
+    console.warn('   Falling back to 6 decimals (may be incorrect!)');
+    return 6;
+  }
+}
+
+/**
+ * Convert human-readable amount to base units using BigInt for precision
+ * @param {number} amount - Human readable amount (e.g., 356343 for BONK)
+ * @param {number} decimals - Token decimals
+ * @returns {string} - Base units as string (for JSON safety)
+ */
+function toBaseUnits(amount, decimals) {
+  // Use string manipulation to avoid floating point errors
+  const amountStr = amount.toString();
+  const [whole, fraction = ''] = amountStr.split('.');
+  
+  // Pad or trim fraction to match decimals
+  const paddedFraction = fraction.padEnd(decimals, '0').slice(0, decimals);
+  
+  // Combine: whole * 10^decimals + paddedFraction
+  const wholeBig = BigInt(whole) * BigInt(10) ** BigInt(decimals);
+  const fractionBig = BigInt(paddedFraction.padStart(decimals, '0'));
+  
+  return (wholeBig + fractionBig).toString();
+}
+
+/**
+ * Convert base units back to human-readable amount
+ * @param {string} baseUnits - Amount in base units
+ * @param {number} decimals - Token decimals
+ * @returns {string} - Human readable amount
+ */
+function fromBaseUnits(baseUnits, decimals) {
+  const base = BigInt(baseUnits);
+  const divisor = BigInt(10) ** BigInt(decimals);
+  
+  const whole = base / divisor;
+  const fraction = base % divisor;
+  
+  // Pad fraction with leading zeros
+  const fractionStr = fraction.toString().padStart(decimals, '0');
+  
+  // Trim trailing zeros but keep at least 2 decimals
+  const trimmedFraction = fractionStr.replace(/0+$/, '').padEnd(2, '0');
+  
+  return `${whole}.${trimmedFraction}`;
 }
 
 function parseArgs() {
@@ -135,45 +250,36 @@ Examples:
     process.exit(1);
   }
   
-  // Convert amount based on input token decimals
+  // Validate amount is positive
   const amountValue = parseFloat(params.amount);
   if (isNaN(amountValue) || amountValue <= 0) {
     console.error('❌ Error: --amount must be a positive number');
     process.exit(1);
   }
   
-  if (params.inputMint === TOKEN_MINTS['SOL']) {
-    params.amount = Math.floor(amountValue * 1000000000).toString();
-  } else if (params.inputMint === TOKEN_MINTS['USDC']) {
-    params.amount = Math.floor(amountValue * 1000000).toString();
-  } else {
-    // For unknown tokens, assume 6 decimals as a safe default
-    params.amount = Math.floor(amountValue * 1000000).toString();
-  }
+  // Store raw amount for later conversion after we fetch decimals
+  params.rawAmount = amountValue;
   
   return params;
 }
 
-function formatAmount(mint, amount, quoteResponse = null) {
-  const amountInt = parseInt(amount);
+function formatAmount(mint, amountBaseUnits, decimals = null) {
+  // Use provided decimals or lookup from registry
+  const tokenDecimals = decimals || TOKEN_DECIMALS[mint] || 6;
+  const formatted = fromBaseUnits(amountBaseUnits, tokenDecimals);
   
-  // Known tokens
-  if (mint === TOKEN_MINTS['SOL']) {
-    return `${(amountInt / 1000000000).toFixed(6)} SOL`;
-  } else if (mint === TOKEN_MINTS['USDC']) {
-    return `${(amountInt / 1000000).toFixed(6)} USDC`;
+  // Get symbol
+  let symbol = '???';
+  for (const [name, addr] of Object.entries(TOKEN_MINTS)) {
+    if (addr === mint) {
+      symbol = name;
+      break;
+    }
+  }
+  if (symbol === '???') {
+    symbol = mint.substring(0, 4) + '...' + mint.substring(mint.length - 4);
   }
   
-  // Unknown token - try to get decimals from quote response or use default
-  let decimals = 6; // safe default
-  if (quoteResponse?.inputMint === mint && quoteResponse?.inDecimals) {
-    decimals = quoteResponse.inDecimals;
-  } else if (quoteResponse?.outputMint === mint && quoteResponse?.outDecimals) {
-    decimals = quoteResponse.outDecimals;
-  }
-  
-  const formatted = (amountInt / Math.pow(10, decimals)).toFixed(Math.min(decimals, 6));
-  const symbol = mint.substring(0, 4) + '...' + mint.substring(mint.length - 4);
   return `${formatted} ${symbol}`;
 }
 
@@ -186,7 +292,8 @@ async function fetchQuote(apiKey, params) {
   }).toString();
   
   const url = `${JUPITER_QUOTE_URL}?${queryString}`;
-  console.log(`📡 Step 1: Fetching quote: ${url}\n`);
+  console.log(`📡 Step 1: Fetching quote...\n`);
+  console.log(`   URL: ${url}\n`);
   
   const response = await fetch(url, {
     method: 'GET',
@@ -314,20 +421,30 @@ async function main() {
   const privateKey = loadWalletPrivateKey();
   const params = parseArgs();
   
-  console.log(`📊 Swap Details:`);
+  console.log(`📊 Initial Parameters:`);
   console.log(`   Wallet: ${walletAddress}`);
   console.log(`   Input: ${params.inputMint.length === 44 ? params.inputMint.substring(0, 8) + '...' + params.inputMint.substring(params.inputMint.length - 8) : params.inputMint}`);
   console.log(`   Output: ${params.outputMint.length === 44 ? params.outputMint.substring(0, 8) + '...' + params.outputMint.substring(params.outputMint.length - 8) : params.outputMint}`);
-  console.log(`   Amount: ${formatAmount(params.inputMint, params.amount)}`);
+  console.log(`   Raw Amount: ${params.rawAmount}`);
   console.log(`   Slippage: ${(parseInt(params.slippageBps) / 100).toFixed(2)}%\n`);
+  
+  // Fetch decimals for input token
+  console.log('📏 Resolving token decimals...\n');
+  const inputDecimals = await fetchTokenDecimals(config.rpcUrl, params.inputMint);
+  
+  // Convert amount to base units using BigInt
+  params.amount = toBaseUnits(params.rawAmount, inputDecimals);
+  
+  console.log(`\n✓ Amount in base units: ${params.amount}`);
+  console.log(`✓ Human readable: ${fromBaseUnits(params.amount, inputDecimals)}\n`);
   
   try {
     // Step 1: Get quote
     const quote = await fetchQuote(config.jupiterKey, params);
     
     console.log(`✓ Quote received`);
-    console.log(`   Input: ${formatAmount(quote.inputMint, quote.inAmount, quote)}`);
-    console.log(`   Output: ${formatAmount(quote.outputMint, quote.outAmount, quote)}`);
+    console.log(`   Input: ${formatAmount(quote.inputMint, quote.inAmount, quote.inDecimals)}`);
+    console.log(`   Output: ${formatAmount(quote.outputMint, quote.outAmount, quote.outDecimals)}`);
     console.log(`   Price Impact: ${quote.priceImpactPct}%\n`);
     
     // Step 2: Get swap transaction
@@ -352,7 +469,7 @@ async function main() {
     console.log('\n✅ SWAP SUCCESSFUL!');
     console.log(`🔗 Signature: ${signature}`);
     console.log(`🌐 Explorer: https://solscan.io/tx/${signature}`);
-    console.log(`\n💰 Swapped ${formatAmount(quote.inputMint, quote.inAmount, quote)} → ${formatAmount(quote.outputMint, quote.outAmount, quote)}`);
+    console.log(`\n💰 Swapped ${formatAmount(quote.inputMint, quote.inAmount, quote.inDecimals)} → ${formatAmount(quote.outputMint, quote.outAmount, quote.outDecimals)}`);
     
   } catch (err) {
     console.error('\n❌ Swap failed:', err.message);
