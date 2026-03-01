@@ -662,13 +662,6 @@ export FUEGO_SERVER=http://127.0.0.1:9000
 let addr = SocketAddr::from(([127, 0, 0, 1], 9000)); // Change port
 ```
 
-**Custom Token Support:**
-```rust
-// Add to server/src/main.rs
-const PYUSD_MINT: &str = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
-// Then implement /pyusd-balance and /build-transfer-pyusd endpoints
-```
-
 ---
 
 ## 🆘 Troubleshooting
@@ -726,27 +719,6 @@ cp ~/.config/solana/fuego-backup.json ~/.fuego/wallet.json
 RUST_LOG=debug ./target/release/fuego-server
 ```
 
-### Performance Tuning
-
-**Faster RPC endpoint:**
-```rust
-// In server/src/main.rs, use premium RPC
-let rpc_url = "https://rpc.helius.xyz/?api-key=YOUR_KEY"; // Premium
-```
-
-**Connection pooling for high-frequency trading:**
-```rust
-// Use connection pool for many transactions
-use solana_client::rpc_client::RpcClient;
-use std::sync::Arc;
-
-lazy_static! {
-    static ref RPC_CLIENT: Arc<RpcClient> = Arc::new(
-        RpcClient::new("https://api.mainnet-beta.solana.com".to_string())
-    );
-}
-```
-
 ---
 
 ## 📋 Supported Tokens & Networks
@@ -762,11 +734,6 @@ lazy_static! {
 - ✅ **mainnet-beta** - Production Solana network
 - ✅ **devnet** - Development/testing network  
 - ✅ **testnet** - Solana testnet (limited use)
-
-### Future Token Support
-- ⏳ **PYUSD** - PayPal USD (Token-2022 format)
-- ⏳ **Custom SPL tokens** - User-defined mints
-- ⏳ **Compressed NFTs** - Metaplex compression
 
 ---
 
