@@ -260,10 +260,13 @@ fuego send GvCoHGGBR97Yphzc6SrRycZyS31oUYBM8m9hLRtJT7r5 0.25 --token USDC --yes
 ```
 
 **🔐 Security Model:**
-- ✅ **Private keys never leave your machine** (client-side signing)
+- ✅ **Private keys never leave your machine** (client-side signing for all transfers)
 - ✅ **File permissions provide real security** (chmod 600)
 - ✅ **No network key exposure** (localhost-only server)
 - ✅ **Standard Solana format** (compatible with CLI tools)
+
+**🔒 One Exception - x402 Payments:**
+The `/x402-purch` endpoint handles the complete payment flow internally (including signing) because x402 requires server-side proof-of-payment generation. This is a deliberate security trade-off: the server temporarily accesses the private key only to sign the specific x402 payment transaction, then immediately clears it from memory. This enables seamless agent purchasing while maintaining the local-first architecture for all other operations.
 
 ---
 
@@ -519,33 +522,6 @@ DmFyLRiJtc4Bz75hjAqPaEJpDfRe4GEnRLPwc3EgeUZF
 - Options are clearly presented without cluttering the address
 - Links work correctly without being split
 
-### Deposit Flow Implementation
-```python
-def handle_deposit_request(self):
-    """Handle user deposit request with clean UX"""
-    # Get current wallet address
-    address = self.get_wallet_address()
-    
-    # Send address alone first (easy copy/paste)
-    self.send_message(address)
-    
-    # Then send options in separate message
-    options = f"""💰 Deposit options:
-
-1️⃣ **MoonPay** (fastest - 1-5 min)
-   https://buy.moonpay.com/?currencyCode=sol&walletAddress={address}
-
-2️⃣ **Direct transfer**
-   Send SOL/USDC/USDT from any wallet
-   
-3️⃣ **Exchange withdraw**
-   Coinbase, Kraken → Solana
-
-🔄 Check balance in dashboard"""
-    
-    self.send_message(options)
-```
-
 ---
 
 ## 🔐 Security Best Practices
@@ -559,11 +535,15 @@ def handle_deposit_request(self):
    # -rw------- 1 user user 658 Feb 18 15:01 wallet.json
    ```
 
-2. **Client-Side Signing**
+2. **Client-Side Signing (with one exception)**
    ```
-   ✅ Private keys never sent over network
-   ✅ Signing happens locally
+   ✅ Private keys never sent over network (for transfers, swaps, etc.)
+   ✅ Signing happens locally in CLI/scripts
    ✅ Server only sees signed transactions (public data)
+   
+   🔒 Exception: x402 payments require server-side signing for 
+      proof-of-payment generation. Key is loaded only for that 
+      specific transaction, then cleared from memory.
    ```
 
 3. **Localhost-Only Server**
