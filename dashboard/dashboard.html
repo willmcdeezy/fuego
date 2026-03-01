@@ -1017,7 +1017,7 @@
                 
                 let html = '';
                 otherTokens.forEach(token => {
-                    const displaySymbol = token.symbol || 'Unknown';
+                    const displaySymbol = getTokenSymbol(token.mint) || 'Unknown';
                     // Try lowercase mint first, then uppercase
                     let priceData = tokenPrices?.[token.mint?.toLowerCase()] || tokenPrices?.[token.mint];
                     const price = priceData?.usd;
