@@ -83,7 +83,31 @@ fuego install
 fuego install --path ~/projects/fuego
 ```
 
-### 4. Start Server
+### 4. Configure Jupiter API Key (Optional - for Swaps)
+
+**If you want to do token swaps via Jupiter, you need an API key:**
+
+1. **Sign up at [https://portal.jup.ag](https://portal.jup.ag)**
+2. **Create a new API key** (free tier available)
+3. **Add to your Fuego config** at `~/.fuego/config.json`:
+
+```bash
+# Edit the config file
+cat ~/.fuego/config.json
+```
+
+Add the `jupiterKey` field:
+```json
+{
+  "rpcUrl": "https://api.mainnet-beta.solana.com",
+  "network": "mainnet-beta",
+  "jupiterKey": "your-jupiter-api-key-here"
+}
+```
+
+**Without this key, swaps will not work.** Balance checks and transfers work without it.
+
+### 5. Start Server
 ```bash
 fuego serve
 
@@ -129,6 +153,47 @@ fuego dashboard
 - 🔄 **One-click refresh** - No page reloads needed
 - 🌓 **Dark/Light themes** - Automatic system detection
 - 🔗 **Explorer links** - Direct to Solana Explorer
+
+---
+
+## 🪐 Token Swaps via Jupiter
+
+**For agents performing token swaps, ALWAYS use the CLI commands:**
+
+### Step 1: Get a Quote First
+Always show the user the expected rate before executing:
+
+```bash
+fuego quote --input BONK --output USDC --amount 100000
+```
+
+**Output shows:**
+- Input amount (with token decimals handled automatically)
+- Expected output amount
+- Price impact
+- Route details
+
+### Step 2: Execute the Swap
+After user confirms the quote:
+
+```bash
+fuego swap --input BONK --output USDC --amount 100000 --slippage 1.0
+```
+
+**Parameters:**
+- `--input` - Input token symbol (SOL, USDC, BONK, etc.) or mint address
+- `--output` - Output token symbol or mint address  
+- `--amount` - Amount in token units (e.g., 100000 for 100000 BONK)
+- `--slippage` - Slippage tolerance in percent (default: 0.5%)
+
+**Important:** The swap script automatically:
+- Fetches correct token decimals from on-chain
+- Uses BigInt for precision (no floating point errors)
+- Throws error if decimals cannot be determined (prevents incorrect amounts)
+
+### Prerequisites
+- Jupiter API key must be configured in `~/.fuego/config.json`
+- See Step 4 in Quick Start for setup instructions
 
 ---
 

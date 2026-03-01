@@ -139,6 +139,47 @@ Your agent is now ready to query balances, build transactions, and submit to the
 
 ---
 
+## 🪐 Jupiter Swaps
+
+Fuego includes Jupiter swap integration for trading any SPL token:
+
+### Setup
+
+**1. Get a Jupiter API Key**
+- Sign up at [https://portal.jup.ag](https://portal.jup.ag)
+- Create a new API key (free tier available)
+
+**2. Add to Fuego Config**
+Edit `~/.fuego/config.json` and add your Jupiter key:
+```json
+{
+  "rpcUrl": "https://api.mainnet-beta.solana.com",
+  "network": "mainnet-beta",
+  "jupiterKey": "your-jupiter-api-key-here"
+}
+```
+
+### Using Swaps
+
+**Check a swap quote first:**
+```bash
+fuego quote --input BONK --output USDC --amount 100000
+```
+
+**Execute a swap:**
+```bash
+fuego swap --input BONK --output USDC --amount 100000 --slippage 1.0
+```
+
+**Supported tokens:** Any SPL token tradable on Jupiter (SOL, USDC, USDT, BONK, JUP, PYTH, etc.)
+
+**Notes:**
+- Input/output can be token symbols (SOL, USDC, BONK) or full mint addresses
+- Slippage defaults to 0.5% (set with `--slippage 1.0` for 1%)
+- The swap script handles token decimals automatically using on-chain lookup
+
+---
+
 ## 📦 Supported Tokens
 
 | Token | Type | Mint | Decimals | Status |
