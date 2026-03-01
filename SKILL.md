@@ -332,15 +332,294 @@ const result = execSync(
 console.log(result);
 ```
 
-**Why this is perfect:**
-- Zero abstraction — CLI does everything
-- Works in any language — bash, Python, Node, Go, whatever
-- Easy to debug — run the same command manually
-- Always up to date — CLI updates, your code doesn't change
-
 ### Alternative: Raw API Integration (Not Recommended)
 
-If you absolutely must use raw API calls instead of the CLI, use the endpoints documented above. But the CLI is strongly preferred.
+If you absolutely must use raw API calls instead of the CLI, use the endpoints documented below. But the CLI is strongly preferred.
+
+---
+
+## Complete API Reference
+
+### GET /
+Root endpoint - returns server status.
+
+```bash
+curl http://127.0.0.1:8080/
+```
+
+**Response:**
+```
+Fuego Server
+```
+
+### GET /health
+Health check endpoint.
+
+```bash
+curl http://127.0.0.1:8080/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "fuego-server",
+  "version": "0.1.0"
+}
+```
+
+### GET /network
+Get the default network configuration.
+
+```bash
+curl http://127.0.0.1:8080/network
+```
+
+**Response:**
+```json
+{
+  "network": "mainnet-beta"
+}
+```
+
+### GET /wallet-address
+Get the local wallet address dynamically.
+
+```bash
+curl http://127.0.0.1:8080/wallet-address
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "address": "DmFyLRiJtc4Bz75hjAqPaEJpDfRe4GEnRLPwc3EgeUZF",
+    "network": "mainnet-beta",
+    "source": "wallet"
+  }
+}
+```
+
+### POST /latest-hash
+Get the latest blockhash for transaction building.
+
+```bash
+curl -X POST http://127.0.0.1:8080/latest-hash \
+  -H "Content-Type: application/json" \
+  -d '{"network": "mainnet-beta"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "blockhash": "J7rBdM33dHKtJwjp...",
+    "network": "mainnet-beta"
+  }
+}
+```
+
+### POST /sol-balance - Check SOL Balance
+```bash
+curl -X POST http://127.0.0.1:8080/sol-balance \
+  -H "Content-Type: application/json" \
+  -d '{"network": "mainnet-beta", "address": "YOUR_ADDRESS"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "address": "YOUR_ADDRESS",
+    "lamports": 105113976,
+    "sol": 0.105113976,
+    "network": "mainnet-beta"
+  }
+}
+```
+
+### POST /usdc-balance - Check USDC Balance
+```bash
+curl -X POST http://127.0.0.1:8080/usdc-balance \
+  -H "Content-Type: application/json" \
+  -d '{"network": "mainnet-beta", "address": "YOUR_ADDRESS"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "usdc": 150.250000,
+    "raw_amount": "150250000",
+    "network": "mainnet-beta"
+  }
+}
+```
+
+### POST /usdt-balance - Check USDT Balance
+```bash
+curl -X POST http://127.0.0.1:8080/usdt-balance \
+  -H "Content-Type: application/json" \
+  -d '{"network": "mainnet-beta", "address": "YOUR_ADDRESS"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "usdt": 75.500000,
+    "raw_amount": "75500000",
+    "network": "mainnet-beta"
+  }
+}
+```
+
+### POST /tokens - Check All Token Balances
+```bash
+curl -X POST http://127.0.0.1:8080/tokens \
+  -H "Content-Type: application/json" \
+  -d '{"network": "mainnet-beta", "address": "YOUR_ADDRESS"}'
+```
+
+Returns SOL + all SPL token balances (USDC, USDT, BONK, etc.)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "wallet": "DmFyLRiJtc4Bz75hjAqPaEJpDfRe4GEnRLPwc3EgeUZF",
+    "network": "mainnet",
+    "sol_balance": 0.105113976,
+    "sol_lamports": 105113976,
+    "token_count": 2,
+    "tokens": [
+      {
+        "symbol": "USDC",
+        "ui_amount": 28.847897,
+        "decimals": 6,
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    ]
+  }
+}
+```
+
+### POST /all-transactions - Get Transaction History
+```bash
+curl -X POST http://127.0.0.1:8080/all-transactions \
+  -H "Content-Type: application/json" \
+  -d '{"network": "mainnet-beta", "address": "YOUR_ADDRESS", "limit": 20}'
+```
+
+Returns all wallet transactions. Fuego transactions (those with `fuego|` in the memo) are styled with rich details in the dashboard.
+
+### POST /build-transfer-sol - Build SOL Transfer
+```bash
+curl -X POST http://127.0.0.1:8080/build-transfer-sol \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "from_address": "YOUR_ADDRESS",
+    "to_address": "RECIPIENT_ADDRESS",
+    "amount": "0.001",
+    "yid": "agent-transfer-123"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "transaction": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEDAb...",
+    "blockhash": "J7rBdM33dHKtJwjp...AbCdEfGhIjKl",
+    "memo": "fuego|SOL|f:YOUR_ADDRESS|t:RECIPIENT|a:1000000|yid:agent-transfer-123|n:",
+    "network": "mainnet-beta"
+  }
+}
+```
+
+### POST /build-transfer-usdc - Build USDC Transfer
+```bash
+curl -X POST http://127.0.0.1:8080/build-transfer-usdc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "from_address": "YOUR_ADDRESS",
+    "to_address": "RECIPIENT_ADDRESS",
+    "amount": "10.50",
+    "yid": "agent-usdc-456"
+  }'
+```
+
+### POST /build-transfer-usdt - Build USDT Transfer
+```bash
+curl -X POST http://127.0.0.1:8080/build-transfer-usdt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "from_address": "YOUR_ADDRESS",
+    "to_address": "RECIPIENT_ADDRESS",
+    "amount": "25.75",
+    "yid": "agent-usdt-789"
+  }'
+```
+
+### POST /submit-transaction - Broadcast Signed Transaction
+```bash
+curl -X POST http://127.0.0.1:8080/submit-transaction \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "transaction": "BASE64_SIGNED_TRANSACTION"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "signature": "5J7XzY...9KpQrS",
+    "explorer_link": "https://explorer.solana.com/tx/5J7XzY...9KpQrS?cluster=mainnet-beta"
+  }
+}
+```
+
+### POST /submit-versioned-transaction - Broadcast Versioned Transaction
+```bash
+curl -X POST http://127.0.0.1:8080/submit-versioned-transaction \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "transaction": "BASE64_VERSIONED_TRANSACTION"
+  }'
+```
+
+### POST /x402-purch - x402 Payment (Server-Side Signing)
+Complete x402 payment flow including server-side signing. Used for Purch.xyz integrations.
+
+```bash
+curl -X POST http://127.0.0.1:8080/x402-purch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network": "mainnet-beta",
+    "product_url": "https://amazon.com/dp/B071G6PFDR",
+    "email": "user@example.com",
+    "shipping_name": "John Doe",
+    "shipping_address_line1": "123 Main St",
+    "shipping_city": "Austin",
+    "shipping_state": "TX",
+    "shipping_postal_code": "78701",
+    "shipping_country": "US"
+  }'
+```
 
 ---
 
@@ -419,8 +698,8 @@ fuego install
 **"Transaction simulation failed" error**
 ```bash
 # Usual cause: Insufficient balance
-# Check balance first
-curl -X POST http://127.0.0.1:8080/balance \
+# Check all token balances first
+curl -X POST http://127.0.0.1:8080/tokens \
   -H "Content-Type: application/json" \
   -d '{"network": "mainnet-beta", "address": "YOUR_ADDRESS"}'
 ```
