@@ -1,6 +1,6 @@
 ---
 name: fuego
-description: Local Agent Solana Wallet. Local signing, local server, local scripts. Everything on your machine.
+description: Local Solana agent wallet with local infra for transfers (SOL, USDC, USDT), Jupiter swaps, and x402 purch.
 homepage: https://fuego.cash
 version: 1.4.0
 metadata:
@@ -16,7 +16,7 @@ metadata:
 
 # Fuego SKILL
 
-Local Solana agent wallet with SOL, USDC, USDT transfers, Jupiter swaps, and local infrastructure (CLI + scripts + server).
+Local Solana agent wallet with local infra for transfers (SOL, USDC, USDT), Jupiter swaps, and x402 purch.
 
 ## Quick Start
 
