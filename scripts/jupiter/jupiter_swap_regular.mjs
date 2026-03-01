@@ -128,9 +128,10 @@ async function fetchTokenDecimals(rpcUrl, mintAddress) {
     
     return decimals;
   } catch (err) {
-    console.warn(`⚠️  Failed to fetch decimals on-chain: ${err.message}`);
-    console.warn('   Falling back to 6 decimals (may be incorrect!)');
-    return 6;
+    console.error(`❌ Failed to fetch decimals on-chain: ${err.message}`);
+    console.error('   Cannot proceed without knowing token decimals.');
+    console.error('   Please add this token to TOKEN_DECIMALS registry or try again.');
+    throw new Error(`Unable to determine decimals for token ${mintAddress}. Swap aborted to prevent incorrect amounts.`);
   }
 }
 
