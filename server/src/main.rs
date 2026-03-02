@@ -921,10 +921,11 @@ async fn x402_purch(
 
     // Build order body based on whether maxPrice is provided
     let order_body = if let Some(max_price) = payload.max_price {
-        // URL-based products with maxPrice: use lineItems, no top-level productUrl
+        // URL-based products with maxPrice: need both productUrl (top level) AND lineItems
         json!({
             "email": payload.email,
             "payerAddress": payer_address,
+            "productUrl": payload.product_url,
             "physicalAddress": physical_address,
             "lineItems": [
                 {
