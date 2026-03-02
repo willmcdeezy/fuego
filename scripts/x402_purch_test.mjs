@@ -57,6 +57,7 @@ async function main() {
   }
 
   const payload = {
+    url: "https://x402.purch.xyz/orders/solana",
     product_url: args.product_url,
     email: args.email,
     name: args.name,
