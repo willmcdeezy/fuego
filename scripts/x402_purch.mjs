@@ -2,12 +2,7 @@
 /**
  * x402_purch.mjs - Call Fuego Rust server /x402-purch to complete a Purch.xyz order with x402 payment.
  *
- * WORK IN PROGRESS: Waiting on CrossMint functionality (e.g. delivery not yet enabled for all states).
- * When CrossMint is ready, uncomment the placeholder logic below and remove the early-exit message.
- *
- * The Rust server handles: POST to Purch URL → 402 → x402-rs signs and retries → returns final response.
- *
- * Usage (when enabled):
+ * Usage:
  *   node x402_purch.mjs --product-url <url> --email <email> --name <name> \
  *     --address-line1 <line1> [--address-line2 <line2>] --city <city> \
  *     --state <state> --postal-code <code> [--country <US>] [--url <purch-endpoint>] [--network <mainnet-beta>]
@@ -25,23 +20,6 @@
  *     --country "US"
  */
 
-import { fileURLToPath } from "url";
-import path from "path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// --- WIP: Waiting on CrossMint. Script exits here and prints message. ---
-console.log("");
-console.log("⏳ Waiting on CrossMint functionality");
-console.log("   (e.g. delivery not yet enabled for all states such as Texas)");
-console.log("   Check back later or contact CrossMint/Purch for availability.");
-console.log("");
-process.exit(0);
-
-// ========== PLACEHOLDER: Full logic below – uncomment when CrossMint is ready ==========
-
-/*
 const RUST_SERVER_URL = process.env.FUEGO_SERVER_URL || "http://127.0.0.1:8080";
 const PURCH_ORDERS_URL = "https://x402.purch.xyz/orders/solana";
 
@@ -76,7 +54,7 @@ async function main() {
   for (const field of required) {
     if (!args[field]) {
       console.error(
-        `❌ Missing required argument: --${field.replace(/_/g, "-")}`,
+        `Missing required argument: --${field.replace(/_/g, "-")}`,
       );
       process.exit(1);
     }
@@ -96,8 +74,9 @@ async function main() {
   if (args.address_line2) payload.address_line2 = args.address_line2;
   if (args.network) payload.network = args.network;
   if (args.payer_address) payload.payer_address = args.payer_address;
+  if (args.max_price) payload.maxPrice = parseInt(args.max_price);
 
-  console.log("🛒 x402 Purch – calling Fuego server /x402-purch");
+  console.log("x402 Purch - calling Fuego server /x402-purch");
   console.log("=".repeat(60));
   console.log(`   URL: ${payload.url}`);
   console.log(`   Product: ${payload.product_url}`);
@@ -112,7 +91,7 @@ async function main() {
       body: JSON.stringify(payload),
     });
   } catch (e) {
-    console.error("❌ Request failed:", e.message);
+    console.error("Request failed:", e.message);
     console.error(
       "   Is the Fuego server running? (e.g. cargo run in server/)",
     );
@@ -127,31 +106,29 @@ async function main() {
     result = { success: false, error: text || `HTTP ${response.status}` };
   }
 
+  console.log("\nResponse:");
+  console.log(JSON.stringify(result, null, 2));
+
   if (result.success) {
     console.log();
-    console.log("✅ Success –", result.x402_note || "Payment accepted.");
+    console.log("Success -", result.x402_note || "Payment accepted.");
     console.log(`   Status: ${result.status}`);
-    console.log();
-    console.log("📋 Response data:");
-    console.log(JSON.stringify(result.data, null, 2));
     if (result.data?.orderId) {
       console.log();
-      console.log("🎉 Order ID:", result.data.orderId);
+      console.log("Order ID:", result.data.orderId);
     }
     return;
   }
 
   console.log();
   console.log(
-    "❌ Request failed:",
+    "Request failed:",
     result.error || result.status || response.status,
   );
-  if (result.data) console.log(JSON.stringify(result.data, null, 2));
   process.exit(1);
 }
 
 main().catch((e) => {
-  console.error("❌", e.message);
+  console.error("Error:", e.message);
   process.exit(1);
 });
-*/
