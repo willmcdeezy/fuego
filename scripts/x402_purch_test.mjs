@@ -51,7 +51,8 @@ async function main() {
       console.error("    --city 'Austin' \\");
       console.error("    --state 'TX' \\");
       console.error("    --postal-code '78701' \\");
-      console.error("    --country 'US'");
+      console.error("    --country 'US' \\");
+      console.error("    --max-price '5000'  # Price in USD cents (e.g., 5000 = $50.00)");
       process.exit(1);
     }
   }
@@ -70,6 +71,7 @@ async function main() {
   };
   
   if (args.address_line2) payload.address_line2 = args.address_line2;
+  if (args.max_price) payload.maxPrice = parseInt(args.max_price);
 
   console.log("Calling Fuego server /x402-purch...");
   console.log("========================================");
