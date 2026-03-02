@@ -919,22 +919,29 @@ async fn x402_purch(
         }
     }
 
-    let mut order_body = json!({
-        "email": payload.email,
-        "payerAddress": payer_address,
-        "productUrl": payload.product_url,
-        "physicalAddress": physical_address
-    });
-    
-    // Add lineItems with maxPrice if provided (required for URL-based products)
-    if let Some(max_price) = payload.max_price {
-        order_body["lineItems"] = json!([
-            {
-                "productUrl": payload.product_url,
-                "maxPrice": max_price
-            }
-        ]);
-    }
+    // Build order body based on whether maxPrice is provided
+    let order_body = if let Some(max_price) = payload.max_price {
+        // URL-based products with maxPrice: use lineItems, no top-level productUrl
+        json!({
+            "email": payload.email,
+            "payerAddress": payer_address,
+            "physicalAddress": physical_address,
+            "lineItems": [
+                {
+                    "productUrl": payload.product_url,
+                    "maxPrice": max_price
+                }
+            ]
+        })
+    } else {
+        // Simple productUrl at top level (for products that don't require maxPrice)
+        json!({
+            "email": payload.email,
+            "payerAddress": payer_address,
+            "productUrl": payload.product_url,
+            "physicalAddress": physical_address
+        })
+    };
     let body_bytes = match serde_json::to_vec(&order_body) {
         Ok(b) => b,
         Err(e) => {
