@@ -943,6 +943,8 @@ async fn x402_purch(
             "physicalAddress": physical_address
         })
     };
+    
+    eprintln!("DEBUG: Order body being sent to Purch: {}", serde_json::to_string_pretty(&order_body).unwrap_or_default());
     let body_bytes = match serde_json::to_vec(&order_body) {
         Ok(b) => b,
         Err(e) => {

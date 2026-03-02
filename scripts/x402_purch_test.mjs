@@ -80,6 +80,9 @@ async function main() {
   console.log("========================================\n");
 
   try {
+    console.log("\nSending to server:");
+    console.log(JSON.stringify(payload, null, 2));
+    
     const response = await fetch(`${RUST_SERVER_URL}/x402-purch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
