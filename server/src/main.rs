@@ -200,6 +200,9 @@ struct X402PurchRequest {
     /// Payer wallet address. If omitted, server uses ~/.fuego wallet to sign the x402 payment.
     #[serde(default)]
     payer_address: Option<String>,
+    /// Maximum price in USD cents (e.g., 5000 = $50.00). Required for URL-based products.
+    #[serde(default, rename = "maxPrice")]
+    max_price: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -916,12 +919,21 @@ async fn x402_purch(
         }
     }
 
+    // Build order body - Purch requires lineItems with maxPrice AND top-level productUrl
     let order_body = json!({
         "email": payload.email,
         "payerAddress": payer_address,
         "productUrl": payload.product_url,
-        "physicalAddress": physical_address
+        "physicalAddress": physical_address,
+        "lineItems": [
+            {
+                "productUrl": payload.product_url,
+                "maxPrice": payload.max_price.unwrap_or(10000)
+            }
+        ]
     });
+    
+    eprintln!("DEBUG: Order body being sent to Purch: {}", serde_json::to_string_pretty(&order_body).unwrap_or_default());
     let body_bytes = match serde_json::to_vec(&order_body) {
         Ok(b) => b,
         Err(e) => {
