@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * x402_purch.mjs - Call Fuego Rust server /x402-purch to complete a Purch.xyz order with x402 payment.
+ * x402_purch.mjs - Complete x402 Purch.xyz flow: create order, sign tx, submit payment.
  *
  * Usage:
  *   node x402_purch.mjs --product-url <url> --email <email> --name <name> \
@@ -20,6 +20,11 @@
  *     --country "US"
  */
 
+import fs from 'fs';
+import os from 'os';
+import { Connection, Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
+import bs58 from 'bs58';
+
 const RUST_SERVER_URL = process.env.FUEGO_SERVER_URL || "http://127.0.0.1:8080";
 const PURCH_ORDERS_URL = "https://x402.purch.xyz/orders/solana";
 
@@ -37,6 +42,35 @@ function parseArgs() {
     }
   }
   return parsed;
+}
+
+function loadWallet() {
+  const walletPath = `${os.homedir()}/.fuego/wallet.json`;
+  try {
+    const content = fs.readFileSync(walletPath, 'utf8');
+    const wallet = JSON.parse(content);
+    return Keypair.fromSecretKey(new Uint8Array(wallet.privateKey || wallet.private_key));
+  } catch (e) {
+    console.error("❌ Failed to load wallet from ~/.fuego/wallet.json");
+    console.error("   Run 'fuego create' first.");
+    process.exit(1);
+  }
+}
+
+async function submitTransaction(serializedTx, network, isVersioned = true) {
+  // Submit via Fuego server (use versioned endpoint for x402)
+  const endpoint = isVersioned ? 'submit-versioned-transaction' : 'submit-transaction';
+  const response = await fetch(`${RUST_SERVER_URL}/${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      network: network || "mainnet-beta",
+      transaction: serializedTx
+    }),
+  });
+  
+  const result = await response.json();
+  return result;
 }
 
 async function main() {
@@ -76,13 +110,13 @@ async function main() {
   if (args.payer_address) payload.payer_address = args.payer_address;
   if (args.max_price) payload.maxPrice = parseInt(args.max_price);
 
-  console.log("x402 Purch - calling Fuego server /x402-purch");
+  console.log("🛒 x402 Purch - Creating order...");
   console.log("=".repeat(60));
-  console.log(`   URL: ${payload.url}`);
   console.log(`   Product: ${payload.product_url}`);
   console.log(`   Email: ${payload.email}`);
   console.log("=".repeat(60));
 
+  // Step 1: Create order via Fuego server
   let response;
   try {
     response = await fetch(`${RUST_SERVER_URL}/x402-purch`, {
@@ -91,41 +125,79 @@ async function main() {
       body: JSON.stringify(payload),
     });
   } catch (e) {
-    console.error("Request failed:", e.message);
-    console.error(
-      "   Is the Fuego server running? (e.g. cargo run in server/)",
-    );
+    console.error("❌ Request failed:", e.message);
+    console.error("   Is the Fuego server running? (e.g. cargo run in server/)");
     process.exit(1);
   }
 
-  const text = await response.text();
-  let result;
+  const result = await response.json();
+
+  if (!result.success) {
+    console.error("\n❌ Order creation failed:");
+    console.error(JSON.stringify(result, null, 2));
+    process.exit(1);
+  }
+
+  console.log("\n✅ Order created!");
+  console.log(`   Order ID: ${result.data?.orderId || result.data?.order?.orderId || 'N/A'}`);
+  console.log(`   Status: ${result.data?.paymentStatus || result.data?.order?.payment?.status || 'N/A'}`);
+  console.log(`   Amount: ${result.data?.quote?.totalPrice?.amount || result.data?.order?.quote?.totalPrice?.amount || 'N/A'} ${result.data?.quote?.totalPrice?.currency?.toUpperCase() || 'USDC'}`);
+
+  // Step 2: Get serialized transaction and sign it
+  const serializedTx = result.data?.serializedTransaction || result.data?.order?.payment?.preparation?.serializedTransaction;
+  
+  if (!serializedTx) {
+    console.error("\n❌ No transaction to sign. Response:");
+    console.error(JSON.stringify(result.data, null, 2));
+    process.exit(1);
+  }
+
+  console.log("\n🔐 Signing transaction...");
+  
+  // Load wallet
+  const keypair = loadWallet();
+  console.log(`   Wallet: ${keypair.publicKey.toBase58()}`);
+
+  // Decode and sign transaction (x402 uses base58, not base64)
+  let signedSerializedTx;
   try {
-    result = JSON.parse(text);
-  } catch {
-    result = { success: false, error: text || `HTTP ${response.status}` };
-  }
-
-  console.log("\nResponse:");
-  console.log(JSON.stringify(result, null, 2));
-
-  if (result.success) {
-    console.log();
-    console.log("Success -", result.x402_note || "Payment accepted.");
-    console.log(`   Status: ${result.status}`);
-    if (result.data?.orderId) {
-      console.log();
-      console.log("Order ID:", result.data.orderId);
+    // x402 transactions are base58 encoded
+    const txBuffer = bs58.decode(serializedTx);
+    console.log(`   Decoded ${txBuffer.length} bytes`);
+    // Try VersionedTransaction first (x402 uses this format)
+    const versionedTx = VersionedTransaction.deserialize(txBuffer);
+    versionedTx.sign([keypair]);
+    signedSerializedTx = Buffer.from(versionedTx.serialize()).toString('base64');
+    console.log("   Signed as VersionedTransaction");
+  } catch (vErr) {
+    try {
+      // Fall back to legacy Transaction with base58
+      const txBuffer = bs58.decode(serializedTx);
+      const transaction = Transaction.from(txBuffer);
+      transaction.sign(keypair);
+      signedSerializedTx = transaction.serialize().toString('base64');
+      console.log("   Signed as legacy Transaction");
+    } catch (e) {
+      console.error("❌ Failed to sign transaction:", e.message);
+      process.exit(1);
     }
-    return;
   }
 
-  console.log();
-  console.log(
-    "Request failed:",
-    result.error || result.status || response.status,
-  );
-  process.exit(1);
+  // Step 3: Submit signed transaction
+  console.log("\n📡 Submitting payment...");
+  
+  const submitResult = await submitTransaction(signedSerializedTx, payload.network, true);
+
+  if (submitResult.success) {
+    console.log("\n🎉 PAYMENT SUCCESSFUL!");
+    console.log(`   Signature: ${submitResult.data?.signature}`);
+    console.log(`   Explorer: ${submitResult.data?.explorer_link}`);
+    console.log("\n✨ Your order is being processed!");
+  } else {
+    console.error("\n❌ Payment submission failed:");
+    console.error(submitResult.error || JSON.stringify(submitResult, null, 2));
+    process.exit(1);
+  }
 }
 
 main().catch((e) => {

@@ -919,30 +919,19 @@ async fn x402_purch(
         }
     }
 
-    // Build order body based on whether maxPrice is provided
-    let order_body = if let Some(max_price) = payload.max_price {
-        // URL-based products with maxPrice: need both productUrl (top level) AND lineItems
-        json!({
-            "email": payload.email,
-            "payerAddress": payer_address,
-            "productUrl": payload.product_url,
-            "physicalAddress": physical_address,
-            "lineItems": [
-                {
-                    "productUrl": payload.product_url,
-                    "maxPrice": max_price
-                }
-            ]
-        })
-    } else {
-        // Simple productUrl at top level (for products that don't require maxPrice)
-        json!({
-            "email": payload.email,
-            "payerAddress": payer_address,
-            "productUrl": payload.product_url,
-            "physicalAddress": physical_address
-        })
-    };
+    // Build order body - Purch requires lineItems with maxPrice AND top-level productUrl
+    let order_body = json!({
+        "email": payload.email,
+        "payerAddress": payer_address,
+        "productUrl": payload.product_url,
+        "physicalAddress": physical_address,
+        "lineItems": [
+            {
+                "productUrl": payload.product_url,
+                "maxPrice": payload.max_price.unwrap_or(10000)
+            }
+        ]
+    });
     
     eprintln!("DEBUG: Order body being sent to Purch: {}", serde_json::to_string_pretty(&order_body).unwrap_or_default());
     let body_bytes = match serde_json::to_vec(&order_body) {
