@@ -24,7 +24,7 @@
 
 ### Recommended: Ask Your Agent
 ```bash
-curl -S https://fuego.cash/skill.md | less
+curl -S https://fuego.cash/skill.md
 ```
 
 **What your agent will do:**
@@ -55,31 +55,19 @@ Your agent is now ready to query balances, build transactions, and submit to the
 
 ---
 
-## 🤖 Why Agents Love Fuego
+## Features
 
-### ❌ Traditional Wallets (Agent Nightmare)
-- 🔒 Remote server with auth can slow and stall access / performance 
-- ⏱️ Slow multi-step processes  
-- 🌐 Browser extensions don't work headlessly
-- 🔐 Private keys exposed to third parties
+### x402 Purch
 
-### ✅ Fuego (Agent Paradise) 
-- 🚀 **Zero friction**: Everything is local! Your agent can customize anything it wants!
-- ⚡ **Instant signing**: Millisecond transaction processing  
-- 🏠 **Local-first**: Keys never leave your machine
-- 📡 **REST API**: Standard HTTP endpoints agents understand
-- 🔄 **Reliable**: Works 24/7 without human intervention
+
+### Jupiter Swaps
+
 
 ---
 
 ## 📚 Full Documentation
 
 **📖 [SKILL.md](./SKILL.md)** - Complete reference:
-- 🔌 All API endpoints with examples  
-- 💰 Deposit flows + MoonPay integration
-- 🔐 Security best practices  
-- 🛠️ Development setup
-- ❗ Troubleshooting guide
 
 ## 🏗️ Agent-Ready Architecture
 
@@ -103,39 +91,13 @@ Your agent is now ready to query balances, build transactions, and submit to the
 
 **🔐 Security Model:**
 - ✅ Private keys stored locally as simple JSON (file permissions = real security)
-- ✅ Server never sees private keys (signs client-side)  
 - ✅ Zero network exposure (localhost only)
-- ✅ Standard Solana wallet format (compatible with CLI tools)
 
 ---
 
-## 🎯 Features
-
-### 🔥 Agent-First Design
-- **Zero friction** - No human intervention required
-- **Instant signing** - Transactions sign in milliseconds  
-- **Simple JSON storage** - Standard Solana CLI format
-- **REST API** - HTTP endpoints agents understand
-- **Auto-retry logic** - Handles network issues gracefully
-
-### 💰 Multi-Token Support  
-- **SOL** - Native Solana token
-- **USDC** - USD Coin (6 decimals)
-- **USDT** - Tether USD (6 decimals)
-
 ### 📊 Professional Dashboard
-- **Real-time balances** with USD values (CoinGecko)
-- **Segmented history** - Fuego transactions + All transactions
-- **Status indicators** - Finalized/Pending with timestamps
-- **Dark/Light themes** - Automatic system detection
-- **One-click refresh** - No page reloads needed
-
-### 🛠️ Developer Experience
-- **Rust server** - Single binary, no dependencies  
-- **TypeScript SDK** - Type-safe client library
-- **JavaScript/Node.js scripts** - Ready-to-use transaction tools
-- **Comprehensive docs** - Every endpoint documented  
-- **Error handling** - Clear error messages for debugging
+- **Real-time balances**
+- **Transaction history**
 
 ---
 
@@ -180,7 +142,7 @@ fuego swap --input BONK --output USDC --amount 100000 --slippage 1.0
 
 ---
 
-## 📦 Supported Tokens
+## 📦 Supported Tokens For Fuego Transfers
 
 | Token | Type | Mint | Decimals | Status |
 |-------|------|------|----------|--------|
@@ -193,7 +155,7 @@ fuego swap --input BONK --output USDC --amount 100000 --slippage 1.0
 ## 🛠️ Development
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (1.85+) - **Required for macOS compatibility**
+- [Rust](https://rustup.rs/) (1.85+)
 - [Node.js](https://nodejs.org/) (18+)
 
 ### Setup
@@ -219,13 +181,6 @@ cd server && cargo build --release
 ---
 
 ## 🔐 Security
-
-### ✅ What Makes Fuego Secure
-- **File permissions** (chmod 600) provide real access control
-- **Local-only server** never exposed to network
-- **Client-side signing** keeps private keys on your machine
-- **Standard format** compatible with official Solana tools
-- **No network key exposure** - keys never sent over HTTP
 
 ### 💡 Security Best Practices
 - Keep `~/.fuego/wallet.json` secure (it's your money!)
@@ -259,21 +214,6 @@ See [fuego-cli documentation](https://github.com/willmcdeezy/fuego-cli) for all 
 
 ---
 
-## 🧪 Testing & Contributions
-
-**We're looking for contributors to build comprehensive test suites!**
-
-Currently, Fuego is battle-tested on mainnet with real transactions, but formal test coverage is growing. If you'd like to help, we'd love contributors for:
-
-- ✅ **Unit tests** - Wallet initialization, transaction signing
-- ✅ **Integration tests** - Server endpoints, balance queries
-- ✅ **Security tests** - Key handling, error cases
-- ✅ **E2E tests** - Full transaction workflows
-
-**Want to contribute tests?** Open an issue or PR on GitHub - all test contributions welcome! 🙏
-
----
-
 ## 🚀 Production Ready
 
 Fuego is **production-ready** for agent deployments:
@@ -281,7 +221,7 @@ Fuego is **production-ready** for agent deployments:
 - ✅ **Battle-tested** - Handles real mainnet transactions
 - ✅ **Error handling** - Graceful failure modes  
 - ✅ **Documentation** - Complete API reference
-- ✅ **Security audited** - No private key exposure, everything is local
+- ✅ **Local & 1005 Open Source** - No private key exposure, everything is local
 - ✅ **Performance** - Millisecond transaction signing
 - ✅ **Reliability** - Works 24/7 without intervention
 
@@ -307,13 +247,12 @@ MIT License - see [LICENSE](LICENSE) for details
 
 - **📖 Documentation**: [SKILL.md](./SKILL.md)
 - **🐛 Issues**: [GitHub Issues](https://github.com/willmcdeezy/fuego/issues)  
-- **💬 Community**: OpenClaw Discord
 - **🐦 Updates**: [@0x_ca55](https://twitter.com/0x_ca55)
 
 
 ---
 
 <div align="center">
-<b>🔥 Built for agents. By agents. 🦞</b><br/>
+<b>🔥 Built for agents. By an agent and their human. 🦞</b><br/>
 <i>The future of autonomous Solana transactions starts here.</i>
 </div>
