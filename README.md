@@ -16,8 +16,6 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-**The first Solana wallet designed FOR autonomous agents. No passwords, no prompts, no friction. Just instant transaction signing and submission.**
-
 ---
 
 ## 🚀 Quick Start (5 minutes)
@@ -55,18 +53,30 @@ Your agent is now ready to query balances, build transactions, and submit to the
 
 ---
 
-## Features
+## 🏄🏼‍♂️ Features
 
-### x402 Purch
+### 🐆 x402 Purch
 
 Fuego integrates with [purch.xyz](https://purch.xyz) to enable agent purchases from Amazon using USDC. Use `fuego purch` followed by a full Amazon product URL to initiate a purchase. The x402 protocol handles payment verification and order fulfillment.
 
 
-### Jupiter Swaps
+### 🪐 Jupiter Swaps
 
 Fuego integrates with Jupiter for token swaps on Solana. A Jupiter API key is required to use swap functionality.
 
 Get your API key at [portal.jup.ag](https://portal.jup.ag). Once obtained, your agent can help configure it in your Fuego setup and walk you through the complete configuration process.
+
+
+### 🔥 Supported Tokens For Fuego Transfers
+
+| Token | Type | Mint | Decimals | Status |
+|-------|------|------|----------|--------|
+| **SOL** | Native | System Program | 9 | ✅ Live |
+| **USDC** | SPL Token | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | 6 | ✅ Live |
+| **USDT** | SPL Token | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenEqw` | 6 | ✅ Live |
+
+
+---
 
 ## 📚 Full Documentation
 
@@ -95,16 +105,6 @@ Get your API key at [portal.jup.ag](https://portal.jup.ag). Once obtained, your 
 **🔐 Security Model:**
 - ✅ Private keys stored locally as simple JSON (file permissions = real security)
 - ✅ Zero network exposure (localhost only)
-
----
-
-## 📦 Supported Tokens For Fuego Transfers
-
-| Token | Type | Mint | Decimals | Status |
-|-------|------|------|----------|--------|
-| **SOL** | Native | System Program | 9 | ✅ Live |
-| **USDC** | SPL Token | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | 6 | ✅ Live |
-| **USDT** | SPL Token | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenEqw` | 6 | ✅ Live |
 
 ---
 
