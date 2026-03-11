@@ -82,6 +82,8 @@ Get your API key at [portal.jup.ag](https://portal.jup.ag). Once obtained, your 
 
 **📖 [SKILL.md](./SKILL.md)** - Complete reference:
 
+---
+
 ## 🏗️ Agent-Ready Architecture
 
 ```
