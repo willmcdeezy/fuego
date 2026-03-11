@@ -64,8 +64,9 @@ Fuego integrates with [purch.xyz](https://purch.xyz) to enable agent purchases f
 
 ### Jupiter Swaps
 
+Fuego integrates with Jupiter for token swaps on Solana. A Jupiter API key is required to use swap functionality.
 
----
+Get your API key at [portal.jup.ag](https://portal.jup.ag). Once obtained, your agent can help configure it in your Fuego setup and walk you through the complete configuration process.
 
 ## 📚 Full Documentation
 
