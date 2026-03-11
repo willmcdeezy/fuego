@@ -59,11 +59,14 @@ Your agent is now ready to query balances, build transactions, and submit to the
 
 ### x402 Purch
 
+Fuego integrates with [purch.xyz](https://purch.xyz) to enable agent purchases from Amazon using USDC. Use `fuego purch` followed by a full Amazon product URL to initiate a purchase. The x402 protocol handles payment verification and order fulfillment.
+
 
 ### Jupiter Swaps
 
+Fuego integrates with Jupiter for token swaps on Solana. A Jupiter API key is required to use swap functionality.
 
----
+Get your API key at [portal.jup.ag](https://portal.jup.ag). Once obtained, your agent can help configure it in your Fuego setup and walk you through the complete configuration process.
 
 ## 📚 Full Documentation
 
@@ -92,53 +95,6 @@ Your agent is now ready to query balances, build transactions, and submit to the
 **🔐 Security Model:**
 - ✅ Private keys stored locally as simple JSON (file permissions = real security)
 - ✅ Zero network exposure (localhost only)
-
----
-
-### 📊 Professional Dashboard
-- **Real-time balances**
-- **Transaction history**
-
----
-
-## 🪐 Jupiter Swaps
-
-Fuego includes Jupiter swap integration for trading any SPL token:
-
-### Setup
-
-**1. Get a Jupiter API Key**
-- Sign up at [https://portal.jup.ag](https://portal.jup.ag)
-- Create a new API key (free tier available)
-
-**2. Add to Fuego Config**
-Edit `~/.fuego/config.json` and add your Jupiter key:
-```json
-{
-  "rpcUrl": "https://api.mainnet-beta.solana.com",
-  "network": "mainnet-beta",
-  "jupiterKey": "your-jupiter-api-key-here"
-}
-```
-
-### Using Swaps
-
-**Check a swap quote first:**
-```bash
-fuego quote --input BONK --output USDC --amount 100000
-```
-
-**Execute a swap:**
-```bash
-fuego swap --input BONK --output USDC --amount 100000 --slippage 1.0
-```
-
-**Supported tokens:** Any SPL token tradable on Jupiter (SOL, USDC, USDT, BONK, JUP, PYTH, etc.)
-
-**Notes:**
-- Input/output can be token symbols (SOL, USDC, BONK) or full mint addresses
-- Slippage defaults to 0.5% (set with `--slippage 1.0` for 1%)
-- The swap script handles token decimals automatically using on-chain lookup
 
 ---
 
