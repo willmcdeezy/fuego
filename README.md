@@ -59,6 +59,8 @@ Your agent is now ready to query balances, build transactions, and submit to the
 
 ### x402 Purch
 
+Fuego integrates with [purch.xyz](https://purch.xyz) to enable agent purchases from Amazon using USDC. Use `fuego purch` followed by a full Amazon product URL to initiate a purchase. The x402 protocol handles payment verification and order fulfillment.
+
 
 ### Jupiter Swaps
 
