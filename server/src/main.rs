@@ -194,7 +194,7 @@ struct X402PurchRequest {
     postal_code: String,
     #[serde(default)]
     country: String,
-    /// Solana network (default mainnet-beta). Optional; used for RPC and payment.
+    /// Optional; echoed / client metadata (RPC uses ~/.fuego/config.json).
     #[serde(default)]
     network: String,
     /// Payer wallet address. If omitted, server uses ~/.fuego wallet to sign the x402 payment.
@@ -216,7 +216,18 @@ struct GetAccountSignatures {
 // State to hold RPC clients (could be expanded for caching)
 #[derive(Clone)]
 struct AppState {
+    rpc_url: String,
     default_network: String,
+}
+
+fn read_fuego_config() -> (String, String) {
+    let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
+    let path = home_dir.join(".fuego").join("config.json");
+    let raw = fs::read_to_string(&path).expect("read ~/.fuego/config.json");
+    let v: serde_json::Value = serde_json::from_str(&raw).expect("parse ~/.fuego/config.json");
+    let rpc_url = v["rpcUrl"].as_str().expect("rpcUrl in ~/.fuego/config.json").to_string();
+    let default_network = v["network"].as_str().expect("network in ~/.fuego/config.json").to_string();
+    (rpc_url, default_network)
 }
 
 fn get_commitment_config(commitment: &Option<String>) -> CommitmentConfig {
@@ -251,11 +262,10 @@ async fn health_check() -> impl IntoResponse {
 }
 
 async fn get_latest_hash(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<RpcNetwork>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
+    let rpc = RpcClient::new(state.rpc_url.clone());
 
     match rpc.get_latest_blockhash() {
         Ok(blockhash) => Json(json!({
@@ -273,11 +283,10 @@ async fn get_latest_hash(
 }
 
 async fn get_sol_balance(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<GetBalanceRequest>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new_with_commitment(rpc_url, CommitmentConfig::confirmed());
+    let rpc = RpcClient::new_with_commitment(state.rpc_url.clone(), CommitmentConfig::confirmed());
 
     let pubkey = match string_to_pub_key(&payload.address) {
         Ok(pk) => pk,
@@ -319,12 +328,11 @@ async fn get_default_network(State(state): State<AppState>) -> impl IntoResponse
 }
 
 async fn get_usdc_balance(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<GetTokenBalanceRequest>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
     let commitment = get_commitment_config(&payload.commitment);
-    let rpc = RpcClient::new_with_commitment(rpc_url, commitment);
+    let rpc = RpcClient::new_with_commitment(state.rpc_url.clone(), commitment);
 
     let pubkey = match string_to_pub_key(&payload.address) {
         Ok(pk) => pk,
@@ -372,12 +380,11 @@ async fn get_usdc_balance(
 }
 
 async fn get_usdt_balance(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<GetTokenBalanceRequest>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
     let commitment = get_commitment_config(&payload.commitment);
-    let rpc = RpcClient::new_with_commitment(rpc_url, commitment);
+    let rpc = RpcClient::new_with_commitment(state.rpc_url.clone(), commitment);
 
     let pubkey = match string_to_pub_key(&payload.address) {
         Ok(pk) => pk,
@@ -425,12 +432,11 @@ async fn get_usdt_balance(
 }
 
 async fn build_transfer_usdc(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<TransferUsdcRequest>,
 ) -> Response {
     // Fetch fresh blockhash
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
+    let rpc = RpcClient::new(state.rpc_url.clone());
 
     let blockhash = match rpc.get_latest_blockhash() {
         Ok(bh) => bh,
@@ -578,12 +584,11 @@ async fn build_transfer_usdc(
 }
 
 async fn build_transfer_sol(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<TransferSolRequest>,
 ) -> Response {
     // Fetch fresh blockhash
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
+    let rpc = RpcClient::new(state.rpc_url.clone());
 
     let blockhash = match rpc.get_latest_blockhash() {
         Ok(bh) => bh,
@@ -706,12 +711,11 @@ async fn build_transfer_sol(
 }
 
 async fn build_transfer_usdt(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<TransferUsdtRequest>,
 ) -> Response {
     // Fetch fresh blockhash
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
+    let rpc = RpcClient::new(state.rpc_url.clone());
 
     let blockhash = match rpc.get_latest_blockhash() {
         Ok(bh) => bh,
@@ -833,7 +837,7 @@ async fn build_transfer_usdt(
 
 // x402 Purch endpoint: call Purch x402 URL with order payload; x402-rs handles 402 → pay → retry; return final response.
 async fn x402_purch(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<X402PurchRequest>,
 ) -> Response {
     use reqwest::Client;
@@ -841,12 +845,6 @@ async fn x402_purch(
     use x402_chain_solana::v1_solana_exact::client::V1SolanaExactClient;
     use x402_chain_solana::v2_solana_exact::client::V2SolanaExactClient;
     use x402_reqwest::{ReqwestWithPayments, ReqwestWithPaymentsBuild, X402Client};
-
-    let network = if payload.network.is_empty() {
-        "mainnet-beta".to_string()
-    } else {
-        payload.network.clone()
-    };
 
     // Load keypair from ~/.fuego/wallet.json (required for signing x402 payment)
     let home_dir = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
@@ -884,8 +882,7 @@ async fn x402_purch(
 
     let keypair = solana_sdk::signer::keypair::Keypair::new_from_array(secret_arr);
 
-    let rpc_url = format!("https://api.{}.solana.com", network);
-    let rpc = solana_client::nonblocking::rpc_client::RpcClient::new(rpc_url);
+    let rpc = solana_client::nonblocking::rpc_client::RpcClient::new(state.rpc_url.clone());
     let rpc_arc = Arc::new(rpc);
     let keypair_arc = Arc::new(keypair);
 
@@ -990,11 +987,10 @@ async fn x402_purch(
 }
 
 async fn submit_transaction(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<SubmitTransactionRequest>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
+    let rpc = RpcClient::new(state.rpc_url.clone());
 
     // Decode base64 transaction
     let tx_bytes = match general_purpose::STANDARD.decode(&payload.transaction) {
@@ -1026,7 +1022,7 @@ async fn submit_transaction(
             let sig_string = signature.to_string();
             let explorer_link = format!(
                 "https://explorer.solana.com/tx/{}?cluster={}",
-                sig_string, payload.network
+                sig_string, state.default_network
             );
             Json(json!({
                 "success": true,
@@ -1049,11 +1045,10 @@ async fn submit_transaction(
 
 // VersionedTransaction endpoint specifically for Jupiter swaps and other v0 transactions
 async fn submit_versioned_transaction(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<SubmitTransactionRequest>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
+    let rpc = RpcClient::new(state.rpc_url.clone());
 
     // Decode base64 transaction
     let tx_bytes = match general_purpose::STANDARD.decode(&payload.transaction) {
@@ -1085,7 +1080,7 @@ async fn submit_versioned_transaction(
             let sig_string = signature.to_string();
             let explorer_link = format!(
                 "https://explorer.solana.com/tx/{}?cluster={}",
-                sig_string, payload.network
+                sig_string, state.default_network
             );
             Json(json!({
                 "success": true,
@@ -1108,10 +1103,10 @@ async fn submit_versioned_transaction(
 }
 
 async fn get_all_transactions(
+    State(state): State<AppState>,
     Json(payload): Json<GetAccountSignatures>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
-    let rpc = RpcClient::new(rpc_url);
+    let rpc = RpcClient::new(state.rpc_url.clone());
 
     let user_pubkey = match string_to_pub_key(&payload.address) {
         Ok(pubkey) => pubkey,
@@ -1212,9 +1207,10 @@ struct TokenAccountInfo {
 }
 
 async fn get_tokens(
+    State(state): State<AppState>,
     Json(payload): Json<GetTokensRequest>,
 ) -> Response {
-    let rpc_url = format!("https://api.{}.solana.com", payload.network);
+    let rpc_url = state.rpc_url.clone();
     let rpc = RpcClient::new(rpc_url.clone());
 
     let wallet_pubkey = match string_to_pub_key(&payload.address) {
@@ -1357,8 +1353,10 @@ async fn get_wallet_address() -> Response {
 
 #[tokio::main]
 async fn main() {
+    let (rpc_url, default_network) = read_fuego_config();
     let state = AppState {
-        default_network: "mainnet-beta".to_string(),
+        rpc_url,
+        default_network,
     };
 
     let cors = CorsLayer::new()
