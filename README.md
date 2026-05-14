@@ -22,7 +22,7 @@
 
 ### Recommended: Ask Your Agent
 ```bash
-curl -S https://fuego.cash/skill.md
+curl -S https://fuego.cash/SKILL.md
 ```
 
 **What your agent will do:**
